@@ -1,0 +1,490 @@
+<title>lensprep Lens Browser</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Spectral:ital,wght@0,500;0,600;1,500&display=swap">
+<style>
+/* Layout: an archive reading room. A sticky search bar over three views (home, sample grid,
+   lens sheet); images always sit on a black plate, the chrome follows the viewer's theme.
+   Band colours encode pivot wavelength (blue F438W ... red F444W), nothing else. */
+:root {
+  --bg: #0b0e13;
+  --raise: #121720;
+  --line: #232b37;
+  --fg: #e6e8ed;
+  --muted: #929bab;
+  --faint: #5d6676;
+  --accent: #e8b25f;
+  --accent-ink: #1a1206;
+  --plate: #000000;
+  --focus: #8fc6ff;
+  --f-display: "Spectral", "Iowan Old Style", Georgia, serif;
+  --f-body: "IBM Plex Sans", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --s-1: 12px; --s0: 14px; --s1: 16px; --s2: 20px; --s3: 28px; --s4: 40px;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f4f5f7; --raise: #ffffff; --line: #d8dce3; --fg: #141923; --muted: #566072;
+    --faint: #8a93a3; --accent: #9a5a0f; --accent-ink: #ffffff; --plate: #05070a; --focus: #1d5fd1;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f4f5f7; --raise: #ffffff; --line: #d8dce3; --fg: #141923; --muted: #566072;
+  --faint: #8a93a3; --accent: #9a5a0f; --accent-ink: #ffffff; --plate: #05070a; --focus: #1d5fd1;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 400 var(--s0)/1.55 var(--f-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--raise); }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-left: var(--gutter-l); padding-right: var(--gutter-r); }
+
+/* top bar */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--raise); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; padding-block: 10px; }
+.brand { display: flex; align-items: baseline; gap: 10px; background: none; border: 0; padding: 0; cursor: pointer; }
+.brand b { font: 600 22px/1 var(--f-display); letter-spacing: 0.01em; }
+.brand span { font-size: var(--s-1); color: var(--muted); }
+.proto { font: 500 11px/1 var(--f-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent); padding: 4px 7px; border-radius: 3px; }
+.crumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--muted); font-size: var(--s-1); min-width: 0; }
+.crumbs button { background: none; border: 0; padding: 0; color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line); }
+.crumbs button:hover { color: var(--fg); }
+.crumbs .here { color: var(--fg); }
+.search { margin-left: auto; position: relative; flex: 0 1 300px; min-width: 200px; }
+.search input { width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font: 400 var(--s0) var(--f-body); }
+.search input::placeholder { color: var(--faint); }
+.results { position: absolute; right: 0; left: 0; top: calc(100% + 4px); background: var(--raise); border: 1px solid var(--line); border-radius: 6px; padding: 4px; max-height: 60vh; overflow: auto; box-shadow: 0 12px 30px rgba(0,0,0,0.35); }
+.results button { display: flex; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: none; border: 0; border-radius: 4px; padding: 7px 8px; cursor: pointer; }
+.results button:hover, .results button.on { background: var(--bg); }
+.results small { color: var(--muted); }
+
+main { padding-block: var(--s3) var(--s4); }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 600; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.1; }
+h2 { font-size: var(--s3); line-height: 1.2; }
+h3 { font-size: var(--s2); }
+p { margin: 0; }
+.eyebrow { font: 500 var(--s-1)/1 var(--f-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lede { max-width: 68ch; color: var(--fg); font-size: var(--s1); }
+.muted { color: var(--muted); }
+
+/* band chips: colour = wavelength */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: 500 var(--s-1)/1 var(--f-mono); padding: 4px 7px 4px 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); white-space: nowrap; }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+button.chip { cursor: pointer; }
+button.chip[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
+.dots { display: flex; gap: 4px; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+
+/* home */
+.intro { display: grid; gap: var(--s1); padding-block: var(--s2) var(--s4); }
+.facts { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 0; }
+.facts div { display: flex; flex-direction: column; }
+.facts dt { font-size: var(--s-1); color: var(--muted); }
+.facts dd { margin: 0; font: 500 var(--s2)/1.2 var(--f-mono); }
+.note { max-width: 72ch; color: var(--muted); font-size: var(--s-1); border-left: 2px solid var(--accent); padding: 2px 0 2px 10px; }
+.tel { padding-block: var(--s3); border-top: 1px solid var(--line); display: grid; gap: var(--s2); }
+.tel-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; }
+.tel-head a { font-size: var(--s-1); color: var(--muted); }
+.samples { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.sample-card { display: grid; gap: 10px; text-align: left; background: var(--raise); border: 1px solid var(--line); border-radius: 8px; padding: 12px; cursor: pointer; min-width: 0; }
+.sample-card:hover { border-color: var(--faint); }
+.strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; background: var(--plate); border-radius: 4px; overflow: hidden; }
+.strip img { width: 100%; aspect-ratio: 1; display: block; object-fit: cover; }
+.sample-card h3 { font-size: var(--s2); }
+.sample-card .refs { font-size: var(--s-1); color: var(--muted); }
+.count { font: 500 var(--s-1)/1 var(--f-mono); color: var(--muted); }
+
+/* sample view */
+.head { display: grid; gap: 10px; padding-bottom: var(--s2); }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding-block: 12px; border-block: 1px solid var(--line); margin-bottom: var(--s2); }
+.toolbar input, .toolbar select { background: var(--raise); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; font: 400 var(--s0) var(--f-body); }
+.toolbar label { font-size: var(--s-1); color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.lens-card { display: grid; gap: 6px; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; min-width: 0; }
+.lens-card .pic { position: relative; background: var(--plate); border-radius: 6px; overflow: hidden; outline: 1px solid var(--line); }
+.lens-card img { width: 100%; aspect-ratio: 1; display: block; }
+.lens-card:hover .pic { outline-color: var(--accent); }
+.lens-card .name { font: 500 var(--s0)/1.2 var(--f-mono); }
+.lens-card .meta { font: 400 var(--s-1)/1.3 var(--f-mono); color: var(--muted); }
+.flag { position: absolute; left: 6px; top: 6px; font: 500 10px/1 var(--f-body); letter-spacing: 0.06em; text-transform: uppercase; background: rgba(0,0,0,0.72); color: #e6e8ed; padding: 3px 5px; border-radius: 3px; }
+.empty { color: var(--muted); padding: var(--s3) 0; }
+
+/* lens view */
+.lens-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.lens-top h1 { font-family: var(--f-mono); font-weight: 500; letter-spacing: -0.01em; }
+.stepper { display: flex; gap: 8px; }
+.stepper button, .btn { background: var(--raise); border: 1px solid var(--line); border-radius: 6px; padding: 7px 11px; cursor: pointer; }
+.stepper button:hover, .btn:hover { border-color: var(--faint); }
+.stepper button:disabled { opacity: 0.4; cursor: default; }
+.lens-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 24px; margin: var(--s2) 0; padding: 14px 0; border-block: 1px solid var(--line); }
+.lens-facts dt { font-size: var(--s-1); color: var(--muted); }
+.lens-facts dd { margin: 2px 0 0; font: 500 var(--s1)/1.3 var(--f-mono); }
+.lens-facts dd small { display: block; font: 400 var(--s-1)/1.3 var(--f-body); color: var(--muted); }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.tab { display: flex; align-items: center; gap: 8px; background: var(--raise); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; cursor: pointer; text-align: left; }
+.tab::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+.tab b { font: 500 var(--s0)/1.1 var(--f-mono); }
+.tab small { display: block; color: var(--muted); font-size: 11px; }
+.tab[aria-selected="true"] { border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
+.panels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+figure { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.plate { position: relative; width: 100%; aspect-ratio: 1; max-width: 100%; background-color: var(--plate); background-size: 400% 100%; background-repeat: no-repeat; border-radius: 5px; cursor: zoom-in; border: 0; padding: 0; display: block; }
+figcaption { font-size: var(--s-1); color: var(--muted); line-height: 1.4; }
+figcaption b { color: var(--fg); font-weight: 600; }
+.bar { position: absolute; left: 8px; bottom: 8px; display: grid; gap: 3px; justify-items: center; color: #fff; font: 500 11px/1 var(--f-mono); text-shadow: 0 0 3px #000, 0 0 2px #000; pointer-events: none; }
+.bar i { display: block; height: 3px; background: #fff; box-shadow: 0 0 0 1px #000; }
+.compass { position: absolute; right: 6px; top: 6px; width: 38px; height: 38px; pointer-events: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--s-1); color: var(--muted); margin: 10px 0 0; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 16px; height: 10px; border: 1.5px solid currentColor; border-radius: 2px; background: rgba(0,0,0,0.5); }
+.sw.dash { border-style: dashed; border-radius: 50%; background: none; }
+.sw.plus { border: 0; background: none; position: relative; color: #6ff0ff; }
+.sw.plus::before, .sw.plus::after { content: ""; position: absolute; background: currentColor; }
+.sw.plus::before { left: 7px; top: 0; width: 2px; height: 10px; }
+.sw.plus::after { left: 3px; top: 4px; width: 10px; height: 2px; }
+.cols { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--s3); margin-top: var(--s3); }
+.details { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 9px 18px; margin: 0; align-content: start; }
+.details dt { color: var(--muted); font-size: var(--s-1); padding-top: 2px; }
+.details dd { margin: 0; }
+.details dd .mono { font-size: var(--s0); }
+.details dd small { color: var(--muted); }
+.side { display: grid; gap: var(--s2); align-content: start; min-width: 0; }
+.review { display: grid; gap: 8px; }
+.review p { max-width: 72ch; font-size: var(--s-1); line-height: 1.55; color: var(--fg); background: var(--raise); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+.files { width: 100%; border-collapse: collapse; font-size: var(--s-1); }
+.files td { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.files td:nth-child(2) { text-align: right; color: var(--muted); padding-right: 14px; white-space: nowrap; }
+.files td:last-child { text-align: right; white-space: nowrap; }
+.files a { color: var(--accent); text-underline-offset: 3px; }
+.tablewrap { overflow-x: auto; }
+
+/* lightbox */
+.lightbox { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,0.88); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) var(--gutter-r) max(16px, env(safe-area-inset-bottom, 0px)) var(--gutter-l); }
+.lightbox .plate { width: min(88vw, 82vh); cursor: zoom-out; }
+.lightbox p { color: #c9ced8; font-size: var(--s-1); margin-top: 10px; text-align: center; }
+
+footer { border-top: 1px solid var(--line); padding-block: var(--s3); color: var(--muted); font-size: var(--s-1); }
+footer .wrap { display: grid; gap: 6px; }
+
+@media (max-width: 900px) {
+  .panels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .search { flex-basis: 100%; margin-left: 0; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .details { grid-template-columns: minmax(0, 1fr); gap: 2px 0; }
+  .details dd { margin-bottom: 8px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lens-card .pic, .sample-card, .tab { transition: border-color 0.15s, outline-color 0.15s; }
+}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <button class="brand" data-go="" aria-label="lensprep home"><b>lensprep</b><span>lens image browser</span></button>
+    <span class="proto">Prototype</span>
+    <nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+    <div class="search">
+      <input id="q" type="search" placeholder="Find a lens, e.g. J0946+1006" autocomplete="off" aria-label="Find a lens">
+      <div class="results" id="results" hidden></div>
+    </div>
+  </div>
+</header>
+<main class="wrap" id="view"></main>
+<footer>
+  <div class="wrap">
+    <p>Data products under CC BY 4.0, code under the MIT License. Please credit the repositories and Samuel C. Lange (The Chinese University of Hong Kong), and cite the survey papers for the lenses you use.</p>
+    <p>Built from the files tracked in <a href="https://github.com/samlange04/HST_lenses_data_reduction">HST_lenses_data_reduction</a> and <a href="https://github.com/samlange04/JWST_lenses_data_reduction">JWST_lenses_data_reduction</a>. Images are shown North up, East left.</p>
+  </div>
+</footer>
+<div class="lightbox" id="lightbox" hidden></div>
+
+<script>
+const CAT = /*__CATALOGUE__*/null;
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const lensBy = Object.fromEntries(CAT.lenses.map(L => [L.token, L]));
+const sampleBy = Object.fromEntries(CAT.samples.map(S => [S.key, S]));
+const telBy = Object.fromEntries(CAT.telescopes.map(T => [T.key, T]));
+const PANELS = [
+  ['Image', 'The science stamp, asinh stretch.'],
+  ['Lensed light', 'Deflector’s radial profile removed and lightly smoothed, a viewing aid.'],
+  ['Noise map', '1σ per pixel, log scale. Streaks are masked cosmic rays and bad columns.'],
+  ['PSF', 'The point-spread function kernel, log scale from 10⁻⁴ of the peak.'],
+];
+const state = { view: 'home', sample: null, lens: null, band: null, filter: '', bands: new Set(), sort: 'name' };
+
+const fmt = {
+  z: v => v == null ? '–' : Number(v).toFixed(3).replace(/0+$/, '').replace(/\.$/, ''),
+  te: v => v == null ? '–' : `${Number(v).toFixed(2)}″`,
+  exp: v => v == null ? '–' : `${Math.round(v).toLocaleString('en-US')} s` + (v >= 3600 ? ` (${(v / 3600).toFixed(1)} h)` : ''),
+  pct: v => `${(100 * v).toFixed(v < 0.1 ? 1 : 0)}%`,
+};
+const chip = b => `<span class="chip" style="--c:${b.colour}">${esc(b.label)}</span>`;
+const nLensBands = () => CAT.lenses.reduce((n, L) => n + L.bands.length, 0);
+
+function go(tokenStr, push = true) {
+  const [t, band] = (tokenStr || '').split('.');
+  if (!t) Object.assign(state, { view: 'home' });
+  else if (sampleBy[t]) Object.assign(state, { view: 'sample', sample: t, filter: '', bands: new Set() });
+  else if (lensBy[t]) {
+    const L = lensBy[t];
+    Object.assign(state, { view: 'lens', lens: t, sample: L.sample,
+      band: (band && L.bands.find(b => b.band === band)) ? band : defaultBand(L) });
+  } else Object.assign(state, { view: 'home' });
+  if (push) { try { history.pushState(null, '', '#' + (tokenStr || '')); } catch (e) {} }
+  render();
+  window.scrollTo(0, 0);
+}
+function defaultBand(L) {
+  const order = ['f814W','F814W','f606W','F606W','f555W','f600LP','f475X','f160W','f438W','F444W','F277W','F356W','F200W','F150W','F115W'];
+  for (const o of order) { const b = L.bands.find(b => b.band === o); if (b) return b.band; }
+  return L.bands[0].band;
+}
+
+function crumbs() {
+  const parts = [`<button data-go="">All samples</button>`];
+  if (state.view !== 'home') {
+    const S = sampleBy[state.sample];
+    parts.push('<span>/</span>', state.view === 'sample'
+      ? `<span class="here">${esc(S.title)}</span>`
+      : `<button data-go="${S.key}">${esc(S.title)}</button>`);
+  }
+  if (state.view === 'lens') parts.push('<span>/</span>', `<span class="here mono">${esc(lensBy[state.lens].name)}</span>`);
+  $('#crumbs').innerHTML = parts.join('');
+}
+
+function home() {
+  const bands = nLensBands();
+  const tels = CAT.telescopes.map(T => {
+    const cards = T.samples.map(k => {
+      const S = sampleBy[k];
+      const thumbs = S.lenses.slice(0, 5).map(t => `<img src="${lensBy[t].thumb}" alt="">`).join('');
+      const nb = S.lenses.reduce((n, t) => n + lensBy[t].bands.length, 0);
+      return `<button class="sample-card" data-go="${S.key}">
+        <div class="strip">${thumbs}</div>
+        <div><h3>${esc(S.title)}</h3><p class="refs">${esc(S.refs)}</p></div>
+        <p class="muted">${esc(S.blurb)}</p>
+        <div class="chips">${S.bands.map(b => `<span class="chip" style="--c:${S.band_colours[b]}">${b}</span>`).join('')}</div>
+        <span class="count">${S.lenses.length} lenses · ${nb} images</span>
+      </button>`;
+    }).join('');
+    const nl = T.samples.reduce((n, k) => n + sampleBy[k].lenses.length, 0);
+    return `<section class="tel" aria-labelledby="t-${T.key}">
+      <div class="tel-head"><h2 id="t-${T.key}">${esc(T.name)}</h2>
+      <span class="count">${nl} lenses · <a href="${T.repo}" target="_blank" rel="noopener">repository ↗</a></span></div>
+      <div class="samples">${cards}</div></section>`;
+  }).join('');
+  return `<section class="intro">
+    <p class="eyebrow">HST and JWST · galaxy-scale strong lenses</p>
+    <h1>Strong-lens images, reduced and ready to model</h1>
+    <p class="lede">Archive imaging of ${CAT.lenses.length} gravitational lenses, reduced into stamps a lens model can use directly: the image, its noise map, the telescope’s point-spread function, a hand-drawn mask of contaminating objects, and the hand-marked positions of the lensed images.</p>
+    <dl class="facts">
+      <div><dt>Lenses</dt><dd>${CAT.lenses.length}</dd></div>
+      <div><dt>Lens–filter images</dt><dd>${bands}</dd></div>
+      <div><dt>Samples</dt><dd>${CAT.samples.length}</dd></div>
+      <div><dt>Telescopes</dt><dd>${CAT.telescopes.length}</dd></div>
+    </dl>
+    <p class="note">Prototype. File links go to the copies in the GitHub repositories. They will point to Zenodo records, one archive per sample, once those are published.</p>
+  </section>${tels}`;
+}
+
+function lensMatches(L) {
+  if (state.filter && !L.name.toLowerCase().includes(state.filter.toLowerCase())) return false;
+  for (const b of state.bands) if (!L.bands.some(x => x.band.split('_')[0].toUpperCase() === b)) return false;
+  return true;
+}
+function sampleView() {
+  const S = sampleBy[state.sample], T = telBy[S.telescope];
+  return `<section class="head">
+      <p class="eyebrow">${esc(T.name)}</p>
+      <h1>${esc(S.title)}</h1>
+      <p class="lede">${esc(S.blurb)}</p>
+      <p class="muted">${esc(S.refs)} · <span class="mono">${S.lenses.length}</span> lenses</p>
+    </section>
+    <div class="toolbar">
+      <input id="filter" type="search" placeholder="Filter by name" value="${esc(state.filter)}" aria-label="Filter lenses by name">
+      <div class="chips" role="group" aria-label="Show lenses observed in">
+        ${S.bands.map(b => `<button class="chip" data-band="${b}" style="--c:${S.band_colours[b]}" aria-pressed="${state.bands.has(b)}">${b}</button>`).join('')}
+      </div>
+      <label>Sort <select id="sort">
+        <option value="name"${state.sort === 'name' ? ' selected' : ''}>Name</option>
+        <option value="te"${state.sort === 'te' ? ' selected' : ''}>Einstein radius</option>
+        <option value="zl"${state.sort === 'zl' ? ' selected' : ''}>Lens redshift</option>
+      </select></label>
+    </div>
+    <div class="grid" id="grid">${lensGrid(S)}</div>`;
+}
+function lensGrid(S) {
+  let Ls = S.lenses.map(t => lensBy[t]).filter(lensMatches);
+  const key = { name: L => L.name, te: L => L.theta_e ?? 99, zl: L => L.zl ?? 99 }[state.sort];
+  Ls.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
+  if (!Ls.length) return `<p class="empty">No lens in this sample matches. Clear the name filter or a filter chip.</p>`;
+  return Ls.map(L => {
+    const empty = L.bands.every(b => b.positions && b.positions.n === 0);
+    return `<button class="lens-card" data-go="${L.token}">
+      <div class="pic"><img src="${L.thumb}" alt="${esc(L.name)}" loading="lazy">${empty ? '<span class="flag">no positions</span>' : ''}</div>
+      <span class="name">${esc(L.name)}</span>
+      <span class="meta">z ${fmt.z(L.zl)} → ${fmt.z(L.zs)} · θ<sub>E</sub> ${fmt.te(L.theta_e)}</span>
+      <span class="dots">${L.bands.map(b => `<i style="--c:${b.colour}" title="${esc(b.label)}"></i>`).join('')}</span>
+    </button>`;
+  }).join('');
+}
+
+const COMPASS = `<svg class="compass" viewBox="0 0 38 38" aria-hidden="true"><g fill="none" stroke-linecap="round" stroke-width="2">
+  <path d="M30 31 V9 M30 9 l-3 4 M30 9 l3 4 M30 31 H8 M8 31 l4 -3 M8 31 l4 3" stroke="#000" stroke-width="4"/>
+  <path d="M30 31 V9 M30 9 l-3 4 M30 9 l3 4 M30 31 H8 M8 31 l4 -3 M8 31 l4 3" stroke="#fff"/></g>
+  <g font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="#fff" stroke="#000" stroke-width="2.5" paint-order="stroke">
+  <text x="27" y="7">N</text><text x="0" y="34">E</text></g></svg>`;
+
+function plate(B, i, big = false) {
+  const pos = `${(i * 100 / 3).toFixed(4)}% 0`;
+  const scalebar = i < 3 ? `<span class="bar"><i style="width:${(100 / B.size).toFixed(3)}cqw"></i>1″</span>` : '';
+  return `<button class="plate" data-panel="${i}" ${big ? 'data-close="1"' : ''} style="background-image:url('${B.img}');background-position:${pos};container-type:inline-size"
+    aria-label="${esc(PANELS[i][0])}, ${esc(B.label)}">${i < 3 ? COMPASS : ''}${scalebar}</button>`;
+}
+
+function lensView() {
+  const L = lensBy[state.lens], S = sampleBy[L.sample];
+  const B = L.bands.find(b => b.band === state.band) || L.bands[0];
+  const i = S.lenses.indexOf(L.token);
+  const prev = S.lenses[i - 1], next = S.lenses[i + 1];
+  const tabs = L.bands.map(b => `<button class="tab" role="tab" data-tab="${b.band}" aria-selected="${b.band === B.band}" style="--c:${b.colour}">
+    <span><b>${esc(b.label)}</b><small>${esc(b.instrument || '')}</small></span></button>`).join('');
+  const figs = PANELS.map((p, k) => `<figure>${plate(B, k)}<figcaption><b>${p[0]}.</b> ${p[1]}</figcaption></figure>`).join('');
+  const psf = B.psf ? `${esc(B.psf.label)}${B.psf.n_stars ? ` · <span class="mono">${B.psf.n_stars}</span> stars` : ''}${B.psf.fwhm ? ` · FWHM <span class="mono">${B.psf.fwhm.toFixed(3)}″</span>` : ''}${B.psf.err != null ? `<br><small>Integrated uncertainty ${fmt.pct(B.psf.err)}${B.psf.err_lower_bound ? ', a lower bound' : ''}. Kernel ${B.psf_px} × ${B.psf_px} px.</small>` : ''}` : '–';
+  const mask = B.mask ? `<span class="mono">${fmt.pct(B.mask.frac)}</span> of pixels excluded${B.mask.source ? `<br><small>${esc(B.mask.source)}.</small>` : ''}` : '<span class="muted">Not drawn yet</span>';
+  const pos = B.positions == null ? '<span class="muted">Not marked yet</span>'
+    : B.positions.n ? `<span class="mono">${B.positions.n}</span> images marked`
+    : `None, deliberately${B.positions.empty ? `<br><small>${esc(B.positions.empty)}</small>` : ''}`;
+  const notes = [L.note, ...B.notes].filter(Boolean);
+  const files = B.files.map(f => `<tr><td class="mono">${esc(f.name)}</td><td>${esc(f.size)}</td><td><a href="${f.url}" target="_blank" rel="noopener">GitHub ↗</a></td></tr>`).join('');
+  return `<section class="lens-top">
+      <div><p class="eyebrow">${esc(telBy[L.telescope].name)} · ${esc(S.title)}</p><h1>${esc(L.name)}</h1></div>
+      <div class="stepper">
+        <button data-go="${prev || ''}" ${prev ? '' : 'disabled'} aria-label="Previous lens">← ${prev ? esc(lensBy[prev].name) : ''}</button>
+        <button data-go="${next || ''}" ${next ? '' : 'disabled'} aria-label="Next lens">${next ? esc(lensBy[next].name) : ''} →</button>
+      </div>
+    </section>
+    <dl class="lens-facts">
+      <div><dt>Position (ICRS)</dt><dd>${esc(L.radec || '–')}</dd></div>
+      <div><dt>Lens redshift</dt><dd>${fmt.z(L.zl)}</dd></div>
+      <div><dt>Source redshift</dt><dd>${fmt.z(L.zs)}</dd></div>
+      <div><dt>Einstein radius</dt><dd>${fmt.te(L.theta_e)}${L.theta_e_src ? `<small>${esc(L.theta_e_src)}</small>` : ''}</dd></div>
+      ${L.sigma ? `<div><dt>Velocity dispersion</dt><dd>${L.sigma} km/s</dd></div>` : ''}
+    </dl>
+    <div class="tabs" role="tablist" aria-label="Filter">${tabs}</div>
+    <div class="panels">${figs}</div>
+    <div class="legend">
+      <span><i class="sw"></i>Masked contaminant, excluded from fits</span>
+      <span><i class="sw plus"></i>Hand-marked lensed image</span>
+      <span><i class="sw dash"></i>Einstein radius</span>
+      <span>Bar: 1 arcsecond</span>
+    </div>
+    <div class="cols">
+      <dl class="details">
+        <dt>Instrument</dt><dd>${esc(B.instrument || '–')}</dd>
+        <dt>Stamp</dt><dd><span class="mono">${B.npix} × ${B.npix}</span> px at <span class="mono">${B.scale}″</span>/px, <span class="mono">${B.size}″</span> across</dd>
+        <dt>Exposure</dt><dd class="mono">${fmt.exp(B.exptime)}</dd>
+        <dt>Units</dt><dd>${esc(B.unit || '–')}</dd>
+        <dt>Noise factor</dt><dd>${B.noisecor ? `<span class="mono">× ${B.noisecor}</span><br><small>Measured correction already applied to the noise map.</small>` : '–'}</dd>
+        <dt>PSF</dt><dd>${psf}</dd>
+        <dt>Mask</dt><dd>${mask}</dd>
+        <dt>Image positions</dt><dd>${pos}</dd>
+      </dl>
+      <div class="side">
+        ${notes.length ? `<div class="review"><h3>Review notes</h3>${notes.map(n => `<p>${esc(n)}</p>`).join('')}
+          <small class="muted">Pixel positions quoted as (col, row) count from the bottom-left corner of these images.</small></div>` : ''}
+        <div><h3>Files</h3><div class="tablewrap"><table class="files"><tbody>${files}</tbody></table></div>
+        <p class="muted" style="font-size:var(--s-1);margin-top:8px">Zenodo download of the whole sample: coming with the first data release.</p></div>
+      </div>
+    </div>`;
+}
+
+function render() {
+  crumbs();
+  const v = $('#view');
+  v.innerHTML = state.view === 'lens' ? lensView() : state.view === 'sample' ? sampleView() : home();
+  document.title = state.view === 'lens' ? `${lensBy[state.lens].name} · lensprep Lens Browser`
+    : state.view === 'sample' ? `${sampleBy[state.sample].title} · lensprep Lens Browser` : 'lensprep Lens Browser';
+}
+
+/* events */
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-go]');
+  if (g && !g.disabled) { e.preventDefault(); closeResults(); go(g.dataset.go); return; }
+  const t = e.target.closest('[data-tab]');
+  if (t) { state.band = t.dataset.tab; render(); return; }
+  const c = e.target.closest('[data-band]');
+  if (c) { const b = c.dataset.band; state.bands.has(b) ? state.bands.delete(b) : state.bands.add(b);
+    c.setAttribute('aria-pressed', state.bands.has(b)); $('#grid').innerHTML = lensGrid(sampleBy[state.sample]); return; }
+  const p = e.target.closest('.plate');
+  if (p && !p.dataset.close) { openBox(+p.dataset.panel); return; }
+  if (e.target.closest('#lightbox')) { closeBox(); return; }
+  if (!e.target.closest('.search')) closeResults();
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'filter') { state.filter = e.target.value; $('#grid').innerHTML = lensGrid(sampleBy[state.sample]); }
+  if (e.target.id === 'q') showResults(e.target.value);
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'sort') { state.sort = e.target.value; $('#grid').innerHTML = lensGrid(sampleBy[state.sample]); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeBox(); closeResults(); return; }
+  if (e.target.id === 'q') {
+    const items = [...document.querySelectorAll('#results button')];
+    if (!items.length) return;
+    let k = items.findIndex(b => b.classList.contains('on'));
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault(); items[k]?.classList.remove('on');
+      k = e.key === 'ArrowDown' ? Math.min(items.length - 1, k + 1) : Math.max(0, k - 1);
+      items[k].classList.add('on');
+    } else if (e.key === 'Enter') { e.preventDefault(); (items[k] || items[0]).click(); e.target.blur(); }
+    return;
+  }
+  if (/input|select|textarea/i.test(e.target.tagName) || !$('#lightbox').hidden) return;
+  if (state.view === 'lens' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    const S = sampleBy[state.sample], i = S.lenses.indexOf(state.lens);
+    const t = S.lenses[i + (e.key === 'ArrowRight' ? 1 : -1)];
+    if (t) go(t);
+  }
+});
+window.addEventListener('popstate', () => go(location.hash.slice(1), false));
+
+function showResults(q) {
+  const box = $('#results');
+  q = q.trim().toLowerCase().replace(/\s+/g, '');
+  if (!q) { closeResults(); return; }
+  const qs = q.replace('+', 'p');
+  const hits = CAT.lenses.filter(L => L.name.toLowerCase().includes(q) || L.token.toLowerCase().includes(qs)).slice(0, 10);
+  const shits = CAT.samples.filter(S => S.title.toLowerCase().replace(/\s+/g, '').includes(q)).slice(0, 3);
+  box.innerHTML = [...shits.map(S => `<button data-go="${S.key}"><span>${esc(S.title)}</span><small>sample</small></button>`),
+    ...hits.map(L => `<button data-go="${L.token}"><span class="mono">${esc(L.name)}</span><small>${esc(sampleBy[L.sample].title)}</small></button>`)].join('')
+    || `<p class="muted" style="padding:8px">No lens or sample matches “${esc(q)}”.</p>`;
+  box.hidden = false;
+}
+function closeResults() { $('#results').hidden = true; }
+function openBox(i) {
+  const L = lensBy[state.lens], B = L.bands.find(b => b.band === state.band);
+  const box = $('#lightbox');
+  box.innerHTML = `<div>${plate(B, i, true)}<p>${esc(L.name)} · ${esc(B.label)} · ${PANELS[i][0]}. Click or press Esc to close.</p></div>`;
+  box.hidden = false;
+}
+function closeBox() { const b = $('#lightbox'); b.hidden = true; b.innerHTML = ''; }
+
+go(location.hash.slice(1), false);
+</script>
