@@ -52,14 +52,16 @@ TELESCOPES = [
 ]
 
 SAMPLES = {
-    'slacs_a': ('SLACS A', 'SLACS "Gold" lenses (Etherington et al. 2022) with marked image positions and no flagged morphology difficulty.',
+    'slacs_prime': ('SLACS prime', 'SLACS "Gold" lenses (Etherington et al. 2022) with marked image positions and no flagged morphology difficulty.',
                 'Bolton et al. 2008; Auger et al. 2009; Etherington et al. 2022'),
-    'slacs_b': ('SLACS B', 'SLACS lenses with image positions whose morphology looks potentially difficult, e.g. a source overlapping the lens centre.',
+    'slacs_complex': ('SLACS complex', 'SLACS lenses with image positions whose morphology looks potentially difficult, e.g. a source overlapping the lens centre.',
                 'Bolton et al. 2008; Auger et al. 2009'),
-    'slacs_c': ('SLACS C', 'The remaining early-type SLACS lenses: no marked positions, or a single band.',
+    'slacs_sparse': ('SLACS sparse', 'The remaining early-type SLACS lenses: no marked positions, or a single band.',
                 'Bolton et al. 2008; Auger et al. 2009'),
     'slacs_late': ('SLACS late-type', 'SLACS lenses with a late-type (spiral) deflector.',
-                   'Bolton et al. 2008'),
+                   'Bolton et al. 2008; Auger et al. 2009'),
+    'slacs_multi': ('SLACS multi-deflector', 'SLACS lenses with more than one deflector galaxy.',
+                    'Bolton et al. 2008; Auger et al. 2009'),
     'swells': ('SWELLS', 'Disk-galaxy deflectors from SWELLS that SLACS also found.',
                'Treu et al. 2011; Brewer et al. 2012'),
     'gallery': ('BELLS GALLERY', 'Lensed Lyman-alpha emitters at z 2–3 behind BOSS galaxies, imaged with WFC3/UVIS.',
