@@ -52,10 +52,16 @@ TELESCOPES = [
 ]
 
 SAMPLES = {
-    'slacs_gold': ('SLACS Gold', 'The 38 SLACS lenses graded "Gold" by Etherington et al. (2022).',
-                   'Bolton et al. 2008; Auger et al. 2009; Etherington et al. 2022'),
-    'slacs_other': ('SLACS', 'The remaining SLACS lenses with a clean early-type deflector.',
-                    'Bolton et al. 2008; Auger et al. 2009'),
+    'slacs_a': ('SLACS A', 'SLACS "Gold" lenses (Etherington et al. 2022) with marked image positions and no flagged morphology difficulty.',
+                'Bolton et al. 2008; Auger et al. 2009; Etherington et al. 2022'),
+    'slacs_b': ('SLACS B', 'SLACS lenses with image positions whose morphology looks potentially difficult, e.g. a source overlapping the lens centre.',
+                'Bolton et al. 2008; Auger et al. 2009'),
+    'slacs_c': ('SLACS C', 'The remaining early-type SLACS lenses: no marked positions, or a single band.',
+                'Bolton et al. 2008; Auger et al. 2009'),
+    'slacs_late': ('SLACS late-type', 'SLACS lenses with a late-type (spiral) deflector.',
+                   'Bolton et al. 2008'),
+    'swells': ('SWELLS', 'Disk-galaxy deflectors from SWELLS that SLACS also found.',
+               'Treu et al. 2011; Brewer et al. 2012'),
     'gallery': ('BELLS GALLERY', 'Lensed Lyman-alpha emitters at z 2–3 behind BOSS galaxies, imaged with WFC3/UVIS.',
                 'Shu et al. 2016'),
     'bells': ('BELLS', 'BOSS emission-line lenses imaged with ACS in F814W.',
