@@ -18,6 +18,8 @@
   --accent-ink: #1a1206;
   --plate: #000000;
   --focus: #8fc6ff;
+  /* category marks: how hard a lens is to model, not good/bad */
+  --cat-prime: #7fd1a8; --cat-complex: #e8b25f; --cat-limited: #929bab; --cat-multi: #c9a0ff;
   --f-display: "Spectral", "Iowan Old Style", Georgia, serif;
   --f-body: "IBM Plex Sans", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -30,12 +32,14 @@
   :root:not([data-theme="dark"]) {
     --bg: #f4f5f7; --raise: #ffffff; --line: #d8dce3; --fg: #141923; --muted: #566072;
     --faint: #8a93a3; --accent: #9a5a0f; --accent-ink: #ffffff; --plate: #05070a; --focus: #1d5fd1;
+    --cat-prime: #1f7a52; --cat-complex: #9a5a0f; --cat-limited: #6b7486; --cat-multi: #6d3fb0;
     color-scheme: light;
   }
 }
 :root[data-theme="light"] {
   --bg: #f4f5f7; --raise: #ffffff; --line: #d8dce3; --fg: #141923; --muted: #566072;
   --faint: #8a93a3; --accent: #9a5a0f; --accent-ink: #ffffff; --plate: #05070a; --focus: #1d5fd1;
+  --cat-prime: #1f7a52; --cat-complex: #9a5a0f; --cat-limited: #6b7486; --cat-multi: #6d3fb0;
   color-scheme: light;
 }
 
@@ -119,6 +123,15 @@ button.chip[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 0
 .lens-card .meta { font: 400 var(--s-1)/1.3 var(--f-mono); color: var(--muted); }
 .flag { position: absolute; left: 6px; top: 6px; font: 500 10px/1 var(--f-body); letter-spacing: 0.06em; text-transform: uppercase; background: rgba(0,0,0,0.72); color: #e6e8ed; padding: 3px 5px; border-radius: 3px; }
 .empty { color: var(--muted); padding: var(--s3) 0; }
+.tag { position: absolute; left: 6px; bottom: 6px; font: 500 10px/1 var(--f-mono); letter-spacing: 0.04em; background: rgba(0,0,0,0.72); color: #e6e8ed; padding: 3px 5px; border-radius: 3px; }
+.cat { display: inline-flex; align-items: center; gap: 6px; font: 500 var(--s-1)/1 var(--f-body); }
+.cat::before { content: ""; width: 9px; height: 9px; border-radius: 2px; background: var(--c); flex: none; }
+.cats { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); }
+.downloads { display: grid; gap: 8px; padding: 12px 0 4px; }
+.downloads ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--s-1); }
+.downloads li { display: inline-flex; gap: 8px; align-items: baseline; }
+.downloads .mono { color: var(--muted); }
+.toolbar select:focus-visible { outline: 2px solid var(--focus); }
 
 /* lens view */
 .lens-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
@@ -221,11 +234,21 @@ const sampleBy = Object.fromEntries(CAT.samples.map(S => [S.key, S]));
 const telBy = Object.fromEntries(CAT.telescopes.map(T => [T.key, T]));
 const PANELS = [
   ['Image', 'The science stamp, asinh stretch.'],
-  ['Lensed light', 'Deflector’s radial profile removed and lightly smoothed, a viewing aid.'],
+  ['Lensed light', 'Deflector removed with an elliptical-isophote model, in S/N and lightly smoothed: red is light the model lacks. A viewing aid.'],
   ['Noise map', '1σ per pixel, log scale. Streaks are masked cosmic rays and bad columns.'],
   ['PSF', 'The point-spread function kernel, log scale from 10⁻⁴ of the peak.'],
 ];
-const state = { view: 'home', sample: null, lens: null, band: null, filter: '', bands: new Set(), sort: 'name' };
+const state = { view: 'home', sample: null, lens: null, band: null, filter: '', bands: new Set(), cats: new Set(), mode: '', sort: 'category' };
+const CATS = {
+  prime: ['Prime', 'var(--cat-prime)', 'P', 'The cleanest systems.'],
+  complex: ['Complex', 'var(--cat-complex)', 'C', 'Harder to model: difficult morphology, blended lens and source light, a low-S/N arc, a nearby companion or a second source.'],
+  limited: ['Limited', 'var(--cat-limited)', 'L', 'No marked image positions, or no lens or source redshift.'],
+  multi_galaxy: ['Multi-galaxy', 'var(--cat-multi)', 'MG', 'More than one deflector galaxy; 30″ stamps centred on the group.'],
+};
+const CAT_ORDER = Object.keys(CATS);
+const MODES = { single_band: ['Single band', 'SB'], multi_band: ['Multi-band', 'MB'] };
+const tagOf = L => L.band_mode && L.category ? `${MODES[L.band_mode][1]}-${CATS[L.category][2]}` : '';
+const catLabel = c => `<span class="cat" style="--c:${CATS[c][1]}">${CATS[c][0]}</span>`;
 
 const fmt = {
   z: v => v == null ? '–' : Number(v).toFixed(3).replace(/0+$/, '').replace(/\.$/, ''),
@@ -239,7 +262,7 @@ const nLensBands = () => CAT.lenses.reduce((n, L) => n + L.bands.length, 0);
 function go(tokenStr, push = true) {
   const [t, band] = (tokenStr || '').split('.');
   if (!t) Object.assign(state, { view: 'home' });
-  else if (sampleBy[t]) Object.assign(state, { view: 'sample', sample: t, filter: '', bands: new Set() });
+  else if (sampleBy[t]) Object.assign(state, { view: 'sample', sample: t, filter: '', bands: new Set(), cats: new Set(), mode: '' });
   else if (lensBy[t]) {
     const L = lensBy[t];
     Object.assign(state, { view: 'lens', lens: t, sample: L.sample,
@@ -279,6 +302,7 @@ function home() {
         <div><h3>${esc(S.title)}</h3><p class="refs">${esc(S.refs)}</p></div>
         <p class="muted">${esc(S.blurb)}</p>
         <div class="chips">${S.bands.map(b => `<span class="chip" style="--c:${S.band_colours[b]}">${b}</span>`).join('')}</div>
+        ${Object.keys(S.categories || {}).length ? `<div class="cats">${CAT_ORDER.filter(c => S.categories[c]).map(c => `<span class="cat" style="--c:${CATS[c][1]}">${S.categories[c]} ${CATS[c][0].toLowerCase()}</span>`).join('')}</div>` : ''}
         <span class="count">${S.lenses.length} lenses · ${nb} images</span>
       </button>`;
     }).join('');
@@ -298,13 +322,15 @@ function home() {
       <div><dt>Samples</dt><dd>${CAT.samples.length}</dd></div>
       <div><dt>Telescopes</dt><dd>${CAT.telescopes.length}</dd></div>
     </dl>
-    <p class="note">Prototype. File links go to the copies in the GitHub repositories. They will point to Zenodo records, one archive per sample, once those are published.</p>
+    <p class="note">Prototype. Each sample is sorted into single- or multi-band lenses and four categories: prime, complex, limited and multi-galaxy. File links go to the copies in the GitHub repositories; the Zenodo records will add one archive per sample and one per sample and filter.</p>
   </section>${tels}`;
 }
 
 function lensMatches(L) {
   if (state.filter && !L.name.toLowerCase().includes(state.filter.toLowerCase())) return false;
   for (const b of state.bands) if (!L.bands.some(x => x.band.split('_')[0].toUpperCase() === b)) return false;
+  if (state.cats.size && !state.cats.has(L.category)) return false;
+  if (state.mode && L.band_mode !== state.mode) return false;
   return true;
 }
 function sampleView() {
@@ -315,12 +341,23 @@ function sampleView() {
       <p class="lede">${esc(S.blurb)}</p>
       <p class="muted">${esc(S.refs)} · <span class="mono">${S.lenses.length}</span> lenses</p>
     </section>
+    ${catKey(S)}
+    ${downloads(S)}
     <div class="toolbar">
       <input id="filter" type="search" placeholder="Filter by name" value="${esc(state.filter)}" aria-label="Filter lenses by name">
+      ${Object.keys(S.categories || {}).length ? `<div class="chips" role="group" aria-label="Show category">
+        ${CAT_ORDER.filter(c => S.categories[c]).map(c => `<button class="chip" data-cat="${c}" style="--c:${CATS[c][1]}" aria-pressed="${state.cats.has(c)}">${CATS[c][0]}</button>`).join('')}
+      </div>
+      ${S.lenses.some(t => lensBy[t].band_mode) ? `<label>Bands <select id="mode">
+        <option value=""${!state.mode ? ' selected' : ''}>Any</option>
+        <option value="single_band"${state.mode === 'single_band' ? ' selected' : ''}>Single band</option>
+        <option value="multi_band"${state.mode === 'multi_band' ? ' selected' : ''}>Multi-band</option>
+      </select></label>` : ''}` : ''}
       <div class="chips" role="group" aria-label="Show lenses observed in">
         ${S.bands.map(b => `<button class="chip" data-band="${b}" style="--c:${S.band_colours[b]}" aria-pressed="${state.bands.has(b)}">${b}</button>`).join('')}
       </div>
       <label>Sort <select id="sort">
+        <option value="category"${state.sort === 'category' ? ' selected' : ''}>Category</option>
         <option value="name"${state.sort === 'name' ? ' selected' : ''}>Name</option>
         <option value="te"${state.sort === 'te' ? ' selected' : ''}>Einstein radius</option>
         <option value="zl"${state.sort === 'zl' ? ' selected' : ''}>Lens redshift</option>
@@ -328,15 +365,27 @@ function sampleView() {
     </div>
     <div class="grid" id="grid">${lensGrid(S)}</div>`;
 }
+function catKey(S) {
+  if (!Object.keys(S.categories || {}).length) return '';
+  return `<div class="cats" style="padding-bottom:12px">${CAT_ORDER.filter(c => S.categories[c]).map(c =>
+    `<span title="${esc(CATS[c][3])}">${catLabel(c)} <span class="mono">${S.categories[c]}</span></span>`).join('')}
+    ${S.lenses.some(t => lensBy[t].band_mode) ? '<span>· Tags: SB/MB single/multi band, then P/C/L/MG</span>' : ''}</div>`;
+}
+function downloads(S) {
+  if (!S.downloads || !S.downloads.length) return '';
+  const per = S.downloads.length > 1 ? S.downloads.map(d => `<li><span>${esc(d.filter)}</span><span class="mono">${d.bands} images · ${esc(d.size)}</span></li>`).join('') : '';
+  return `<div class="downloads"><p class="muted">Release archives (Zenodo, with the first data release): the whole sample, <span class="mono">${esc(S.download_total)}</span>${per ? ', or one filter at a time, whatever the category:' : '.'}</p>${per ? `<ul>${per}</ul>` : ''}</div>`;
+}
 function lensGrid(S) {
   let Ls = S.lenses.map(t => lensBy[t]).filter(lensMatches);
-  const key = { name: L => L.name, te: L => L.theta_e ?? 99, zl: L => L.zl ?? 99 }[state.sort];
+  const key = { name: L => L.name, te: L => L.theta_e ?? 99, zl: L => L.zl ?? 99,
+    category: L => `${L.band_mode === 'multi_band' ? 0 : 1}${CAT_ORDER.indexOf(L.category ?? '')}${L.name}` }[state.sort];
   Ls.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
   if (!Ls.length) return `<p class="empty">No lens in this sample matches. Clear the name filter or a filter chip.</p>`;
   return Ls.map(L => {
     const empty = L.bands.every(b => b.positions && b.positions.n === 0);
     return `<button class="lens-card" data-go="${L.token}">
-      <div class="pic"><img src="${L.thumb}" alt="${esc(L.name)}" loading="lazy">${empty ? '<span class="flag">no positions</span>' : ''}</div>
+      <div class="pic"><img src="${L.thumb}" alt="${esc(L.name)}" loading="lazy">${empty ? '<span class="flag">no positions</span>' : ''}${tagOf(L) ? `<span class="tag" title="${esc(MODES[L.band_mode][0])}, ${esc(CATS[L.category][0].toLowerCase())}">${tagOf(L)}</span>` : ''}</div>
       <span class="name">${esc(L.name)}</span>
       <span class="meta">z ${fmt.z(L.zl)} → ${fmt.z(L.zs)} · θ<sub>E</sub> ${fmt.te(L.theta_e)}</span>
       <span class="dots">${L.bands.map(b => `<i style="--c:${b.colour}" title="${esc(b.label)}"></i>`).join('')}</span>
@@ -368,7 +417,7 @@ function lensView() {
   const psf = B.psf ? `${esc(B.psf.label)}${B.psf.n_stars ? ` · <span class="mono">${B.psf.n_stars}</span> stars` : ''}${B.psf.fwhm ? ` · FWHM <span class="mono">${B.psf.fwhm.toFixed(3)}″</span>` : ''}${B.psf.err != null ? `<br><small>Integrated uncertainty ${fmt.pct(B.psf.err)}${B.psf.err_lower_bound ? ', a lower bound' : ''}. Kernel ${B.psf_px} × ${B.psf_px} px.</small>` : ''}` : '–';
   const mask = B.mask ? `<span class="mono">${fmt.pct(B.mask.frac)}</span> of pixels excluded${B.mask.source ? `<br><small>${esc(B.mask.source)}.</small>` : ''}` : '<span class="muted">Not drawn yet</span>';
   const pos = B.positions == null ? '<span class="muted">Not marked yet</span>'
-    : B.positions.n ? `<span class="mono">${B.positions.n}</span> images marked`
+    : B.positions.n ? `<span class="mono">${B.positions.n}</span> images marked${B.positions.sets && B.positions.sets.length > 1 ? `<br><small>${B.positions.sets.length} sources: ${B.positions.sets.join(' + ')} images</small>` : ''}`
     : `None, deliberately${B.positions.empty ? `<br><small>${esc(B.positions.empty)}</small>` : ''}`;
   const notes = [L.note, ...B.notes].filter(Boolean);
   const files = B.files.map(f => `<tr><td class="mono">${esc(f.name)}</td><td>${esc(f.size)}</td><td><a href="${f.url}" target="_blank" rel="noopener">GitHub ↗</a></td></tr>`).join('');
@@ -385,13 +434,14 @@ function lensView() {
       <div><dt>Source redshift</dt><dd>${fmt.z(L.zs)}</dd></div>
       <div><dt>Einstein radius</dt><dd>${fmt.te(L.theta_e)}${L.theta_e_src ? `<small>${esc(L.theta_e_src)}</small>` : ''}</dd></div>
       ${L.sigma ? `<div><dt>Velocity dispersion</dt><dd>${L.sigma} km/s</dd></div>` : ''}
+      ${L.category ? `<div><dt>Category</dt><dd>${catLabel(L.category)}<small>${L.band_mode ? esc(MODES[L.band_mode][0]) : ''}${L.category_reason ? (L.band_mode ? '. ' : '') + esc(L.category_reason.replace(/\s*\(Sam[^)]*\)/g, '')) : ''}${L.gold ? '. Etherington et al. 2022 Gold' : ''}</small></dd></div>` : ''}
     </dl>
     <div class="tabs" role="tablist" aria-label="Filter">${tabs}</div>
     <div class="panels">${figs}</div>
     <div class="legend">
       <span><i class="sw"></i>Masked contaminant, excluded from fits</span>
       <span><i class="sw plus"></i>Hand-marked lensed image</span>
-      <span><i class="sw dash"></i>Einstein radius</span>
+      <span><i class="sw dash"></i>Einstein radius, on the deflector</span>
       <span>Bar: 1 arcsecond</span>
     </div>
     <div class="cols">
@@ -428,6 +478,9 @@ document.addEventListener('click', e => {
   if (g && !g.disabled) { e.preventDefault(); closeResults(); go(g.dataset.go); return; }
   const t = e.target.closest('[data-tab]');
   if (t) { state.band = t.dataset.tab; render(); return; }
+  const k = e.target.closest('[data-cat]');
+  if (k) { const c = k.dataset.cat; state.cats.has(c) ? state.cats.delete(c) : state.cats.add(c);
+    k.setAttribute('aria-pressed', state.cats.has(c)); $('#grid').innerHTML = lensGrid(sampleBy[state.sample]); return; }
   const c = e.target.closest('[data-band]');
   if (c) { const b = c.dataset.band; state.bands.has(b) ? state.bands.delete(b) : state.bands.add(b);
     c.setAttribute('aria-pressed', state.bands.has(b)); $('#grid').innerHTML = lensGrid(sampleBy[state.sample]); return; }
@@ -442,6 +495,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'sort') { state.sort = e.target.value; $('#grid').innerHTML = lensGrid(sampleBy[state.sample]); }
+  if (e.target.id === 'mode') { state.mode = e.target.value; $('#grid').innerHTML = lensGrid(sampleBy[state.sample]); }
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeBox(); closeResults(); return; }

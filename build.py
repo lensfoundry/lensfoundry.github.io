@@ -10,9 +10,14 @@ carries. Writes
     <out>/index.html            the page: template.html with the catalogue embedded as JSON
     <out>/img/<lens>__<band>.jpg one sprite per band: image | lensed light | noise | PSF
 
+The HST stamps sit at data/stamps/<sample>/<band_mode>/<category>/<lens>/<band>/ (since
+2026-11-02), the JWST ones still at data/stamps/<sample>/<lens>/<band>/; the lens and band are
+always the last two path parts.
+
 Panels are drawn North up, East left (FITS column to the right, row upwards), so a (col, row)
 quoted in a review note counts from the bottom-left corner. The "lensed light" panel subtracts
-the deflector's azimuthal median profile: a finding aid, never photometry.
+an elliptical-isophote model of the deflector (the HST repo's scripts/isophote_model.py, the
+same view as its positions GUI): a finding aid, never photometry.
 
 Download links point at the files on GitHub until the Zenodo records exist; then the manifest
 replaces them (release plan, step 5).
@@ -35,10 +40,12 @@ from PIL import Image
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from scipy.ndimage import gaussian_filter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CODE = os.path.dirname(HERE)
+import sys
+sys.path.insert(0, os.path.join(CODE, 'HST_lenses_data_reduction', 'scripts'))
+import isophote_model  # noqa: E402
 PANEL = 480          # px per panel side in the sprite
 THUMB = 220          # px, lens-card thumbnail (central crop)
 
@@ -52,32 +59,22 @@ TELESCOPES = [
 ]
 
 SAMPLES = {
-    'slacs_prime': ('SLACS prime', 'SLACS "Gold" lenses (Etherington et al. 2022) with marked image positions and no flagged morphology difficulty.',
-                'Bolton et al. 2008; Auger et al. 2009; Etherington et al. 2022'),
-    'slacs_complex': ('SLACS complex', 'SLACS lenses with image positions whose morphology looks potentially difficult, e.g. a source overlapping the lens centre.',
-                'Bolton et al. 2008; Auger et al. 2009'),
-    'slacs_sparse': ('SLACS sparse', 'The remaining early-type SLACS lenses: no marked positions, or a single band.',
-                'Bolton et al. 2008; Auger et al. 2009'),
-    'slacs_late': ('SLACS late-type', 'SLACS lenses with a late-type (spiral) deflector.',
-                   'Bolton et al. 2008; Auger et al. 2009'),
-    'slacs_multi': ('SLACS multi-deflector', 'SLACS lenses with more than one deflector galaxy.',
-                    'Bolton et al. 2008; Auger et al. 2009'),
+    'slacs': ('SLACS', 'Lenses from the Sloan Lens ACS Survey: early-type deflectors at z 0.06–0.5 with emission-line sources.',
+              'Bolton et al. 2008; Auger et al. 2009; Etherington et al. 2022'),
     'swells': ('SWELLS', 'Disk-galaxy deflectors from SWELLS that SLACS also found.',
                'Treu et al. 2011; Brewer et al. 2012'),
     'gallery': ('BELLS GALLERY', 'Lensed Lyman-alpha emitters at z 2–3 behind BOSS galaxies, imaged with WFC3/UVIS.',
                 'Shu et al. 2016'),
     'bells': ('BELLS', 'BOSS emission-line lenses imaged with ACS in F814W.',
               'Brownstein et al. 2012'),
-    'sl2s_dinos_a': ('SL2S + Project Dinos', 'SL2S lenses with deep GO-17130 F475X and an older optical band.',
-                     'Sonnenfeld et al. 2013; Sheu et al. 2025'),
-    'sl2s_dinos_x': ('SL2S + Project Dinos, F475X', 'SL2S lenses whose only deep band is the GO-17130 F475X.',
-                     'Sonnenfeld et al. 2013; Sheu et al. 2025'),
-    'sl2s_wf': ('SL2S, WFPC2', 'SL2S lenses with WFPC2 F606W imaging.',
-                'Sonnenfeld et al. 2013'),
-    'sl2s_snap': ('SL2S snapshots', 'SL2S lenses with only the 720 s F475X + F600LP snapshots.',
-                  'Sonnenfeld et al. 2013'),
+    'dinos': ('SL2S + Project Dinos', 'SL2S lenses re-imaged in deep WFC3/UVIS F475X by Project Dinos.',
+              'Sonnenfeld et al. 2013; Sheu et al. 2025'),
+    'sl2s': ('SL2S', 'The other SL2S lenses: older WFPC2 F606W or short F475X + F600LP snapshots.',
+             'Sonnenfeld et al. 2013'),
     'b1938': ('JVAS B1938+666', 'A radio-loud Einstein ring with 21 dithers per filter, ~24 h each.',
               'GO 8281 (PI Vegetti)'),
+    'cowls_spectacular': ('COWLS spectacular', 'The 17 top-tier lenses of the COSMOS-Web Lens Survey, imaged with NIRCam.',
+                          'Mahler et al. 2025 (COWLS II)'),
     'spt': ('SPT dusty lenses', 'Two lensed dusty star-forming galaxies from the TEMPLATES Early Release Science program.',
             'Rigby et al. 2025 (TEMPLATES)'),
 }
@@ -161,21 +158,6 @@ def mad_sigma(x):
     return 1.4826 * np.median(np.abs(x - np.median(x))) or (np.std(x) or 1.0)
 
 
-def radial_profile_subtract(img, exclude):
-    n0, n1 = img.shape
-    yy, xx = np.indices(img.shape)
-    r = np.hypot(yy - (n0 - 1) / 2, xx - (n1 - 1) / 2).round().astype(int)
-    good = np.isfinite(img) & ~exclude
-    prof = np.zeros(r.max() + 1)
-    for k in range(r.max() + 1):
-        sel = good & (r == k)
-        if sel.any():
-            prof[k] = np.median(img[sel])
-        elif k:
-            prof[k] = prof[k - 1]
-    return img - prof[r]
-
-
 def render(arr, cmap, vmin, vmax, overlay=None):
     """One square panel as an (PANEL, PANEL, 3) uint8 array. overlay(ax) draws on top."""
     fig = plt.figure(figsize=(PANEL / 100, PANEL / 100), dpi=100)
@@ -195,7 +177,10 @@ def render(arr, cmap, vmin, vmax, overlay=None):
 HALO = [pe.Stroke(linewidth=3.2, foreground='black'), pe.Normal()]
 
 
-def panels(sci, noise, psf, mask, positions_px, theta_px):
+SET_COLOURS = ['#6ff0ff', '#ff86d8', '#a6f36a', '#ffb347']   # positions: source 1, 2, ...
+
+
+def panels(sci, noise, psf, mask, position_sets_px, theta_px, scale, centre=None):
     n = sci.shape[0]
     finite = np.isfinite(sci) & np.isfinite(noise) & (noise < 1e7)
     sci = np.where(finite, sci, np.nan)
@@ -206,7 +191,6 @@ def panels(sci, noise, psf, mask, positions_px, theta_px):
     outer = finite & ~mask & (r > 0.35 * n)
     sky = np.nanmedian(sci[outer]) if outer.any() else np.nanmedian(sci)
     sig = mad_sigma(sci[outer] if outer.any() else sci)
-    sig_s = sig * 0.45   # rough sigma after the 0.8 px smoothing
 
     # 1. image: asinh about the sky
     a = 2.0 * sig
@@ -215,15 +199,10 @@ def panels(sci, noise, psf, mask, positions_px, theta_px):
     hi = np.nanpercentile(img[core], 99.9) if core.any() else np.nanmax(img)
     p1 = render(np.nan_to_num(img, nan=-9), 'inferno', np.arcsinh(-1.5 * sig / a), hi)
 
-    # 2. lensed light: deflector's azimuthal median removed, contaminant mask shaded
-    sub = radial_profile_subtract(sci - sky, mask | ~finite)
-    sub = gaussian_filter(np.nan_to_num(sub), 0.8)   # light smoothing: a display aid for faint arcs
-    b = 1.5 * sig_s
-    sv = np.arcsinh(sub / b)
-    reach = min(0.3 * n, 3.0 * theta_px) if theta_px else 0.3 * n
-    win = finite & ~mask & (r < reach) & (r > 2)
-    hi2 = np.nanpercentile(sv[win], 99.7) if win.sum() > 20 else np.nanmax(sv)
-    hi2 = max(hi2, np.arcsinh(6))
+    # 2. lensed light: an elliptical-isophote model of the deflector removed (the positions
+    # GUI's own view), on the S/N image, lightly smoothed; red = light the model lacks.
+    snr = np.where(finite, (sci - sky) / np.where(noise > 0, noise, np.inf), 0.0)
+    res, vdiv = isophote_model.isophote_display(snr, scale, exclude=mask | ~finite, centre=centre)
 
     def over(ax):
         if mask.any():
@@ -234,14 +213,15 @@ def panels(sci, noise, psf, mask, positions_px, theta_px):
             for c in getattr(cs, 'collections', [cs]):
                 c.set_path_effects(HALO)
         if theta_px:
-            circ = plt.Circle(((n - 1) / 2, (n - 1) / 2), theta_px, fill=False, color='white',
+            cx, cy = centre if centre is not None else ((n - 1) / 2, (n - 1) / 2)
+            circ = plt.Circle((cx, cy), theta_px, fill=False, color='black',
                               lw=1.1, ls=(0, (4, 3)), alpha=0.85)
-            circ.set_path_effects(HALO)
             ax.add_patch(circ)
-        for col, row in positions_px:
-            ax.plot([col], [row], marker='+', ms=17, mew=2.0, color='#6ff0ff',
-                    path_effects=[pe.Stroke(linewidth=4.5, foreground='black'), pe.Normal()])
-    p2 = render(np.nan_to_num(sv, nan=0), 'inferno', np.arcsinh(-0.6 / 1.5), hi2, over)
+        for k, pts in enumerate(position_sets_px):
+            for col, row in pts:
+                ax.plot([col], [row], marker='+', ms=17, mew=2.0, color=SET_COLOURS[k % len(SET_COLOURS)],
+                        path_effects=[pe.Stroke(linewidth=4.5, foreground='black'), pe.Normal()])
+    p2 = render(np.nan_to_num(res, nan=0), 'RdBu_r', -vdiv, vdiv, over)
 
     # 3. noise map, log
     nz = np.where(finite, noise, np.nan)
@@ -339,6 +319,25 @@ def notes_of(rec):
     return out
 
 
+def clean_reason(r):
+    """A category reason for the page: no attribution, and none when it only restates the category."""
+    r = re.sub(r'\s*\((?:Sam|by eye)[^)]*\)', '', r or '').strip(' .;')
+    return None if r.lower() in ('', 'complex', 'complex (sam)') else r[0].upper() + r[1:]
+
+
+def read_position_sets(path):
+    """[[(y, x), ...], ...] arcsec: one set per source. A one-set file is a single
+    Grid2DIrregular, a multi-set file autoconf's list type (positions_io.py in the HST repo)."""
+    d = json.load(open(path))
+    grids = d['values'] if d.get('type') == 'list' else [d]
+    out = []
+    for g in grids:
+        v = g['arguments']['values']
+        vals = v.get('array', v.get('values', [])) if isinstance(v, dict) else v
+        out.append([(float(y), float(x)) for y, x in vals])
+    return out
+
+
 def build(out, only=None):
     os.makedirs(os.path.join(out, 'img'), exist_ok=True)
     cat = dict(telescopes=[], samples=[], lenses=[])
@@ -358,18 +357,23 @@ def build(out, only=None):
             stamp_dirs = sorted({os.path.dirname(f) for f in files
                                  if f.startswith(f'data/stamps/{sample}/')
                                  and re.search(r'/stamp[\d.]+_sci\.fits$', f)})
-            lenses = sorted({d.split('/')[3] for d in stamp_dirs})
+            # the lens and band are the last two parts at either depth
+            lenses = sorted({d.split('/')[-2] for d in stamp_dirs})
             if not lenses:
                 continue
             title, blurb, refs = SAMPLES.get(sample, (sample, sblock.get('description', ''), ''))
             s_entry = dict(key=sample, telescope=tel['key'], title=title, blurb=blurb, refs=refs,
-                           lenses=[], bands=set())
+                           lenses=[], bands=set(), categories={})
+            dl = {}      # filter -> [n bands, bytes]: the per-(sample, filter) release archives
             for lens in lenses:
                 if only and lens != only:
                     continue
                 entry = sblock['lenses'].get(lens, {}) if isinstance(sblock['lenses'], dict) else {}
                 L = dict(name=lens, token=token(lens), sample=sample, telescope=tel['key'],
-                         note=entry.get('note'), bands=[])
+                         note=entry.get('note'), bands=[],
+                         band_mode=entry.get('band_mode'), category=entry.get('category'),
+                         category_reason=clean_reason(entry.get('category_reason')),
+                         gold=bool(entry.get('etherington_gold')))
                 er = einstein.get(lens, {})
                 L['zl'] = er.get('zlens', entry.get('redshift_lens'))
                 L['zs'] = er.get('zsrc', entry.get('redshift_source'))
@@ -379,10 +383,10 @@ def build(out, only=None):
                 L['theta_e_src'] = (er.get('source') or '').split(',')[0] or None
                 if tel['key'] == 'jwst' and lens in JWST_THETA_E:
                     L['theta_e'], L['theta_e_src'] = JWST_THETA_E[lens]
-                bands = sorted([d.split('/')[4] for d in stamp_dirs if d.split('/')[3] == lens],
-                               key=lambda b: (PIVOT.get(base_band(b), 9), b))
+                ldirs = {d.split('/')[-1]: d for d in stamp_dirs if d.split('/')[-2] == lens}
+                bands = sorted(ldirs, key=lambda b: (PIVOT.get(base_band(b), 9), b))
                 for band in bands:
-                    bdir = f'data/stamps/{sample}/{lens}/{band}'
+                    bdir = ldirs[band]
                     bfiles = sorted(f for f in files if os.path.dirname(f) == bdir)
                     sci_rel = next(f for f in bfiles if re.search(r'/stamp[\d.]+_sci\.fits$', f))
                     prefix = os.path.basename(sci_rel)[:-len('_sci.fits')]
@@ -406,13 +410,13 @@ def build(out, only=None):
                         L['ra'], L['dec'] = round(sky.ra.deg, 6), round(sky.dec.deg, 6)
                         L['radec'] = sky.to_string('hmsdms', sep=':', precision=2)
                     prel = f'{bdir}/{prefix}_positions.json'
-                    positions = []
-                    if prel in files:
-                        v = json.load(open(ab(prel)))['arguments']['values']
-                        vals = v.get('array', v.get('values', []))   # an empty grid may be saved as a list
-                        positions = [(c + x / scale, c - y / scale) for y, x in vals]
+                    sets = read_position_sets(ab(prel)) if prel in files else []
+                    position_sets = [[(c + x / scale, c - y / scale) for y, x in st] for st in sets]
+                    positions = [p for st in position_sets for p in st]
                     theta_px = (L['theta_e'] / scale) if L.get('theta_e') else None
-                    sprite, thumb = panels(sci, noise, psf, mask, positions, theta_px)
+                    # a group-centred (multi_galaxy) stamp: model and θ_E circle on the deflector
+                    dpix = isophote_model.deflector_pixel(ab(sci_rel)) if tel['key'] == 'hst' else None
+                    sprite, thumb = panels(sci, noise, psf, mask, position_sets, theta_px, scale, dpix)
                     img_name = f"img/{L['token']}__{band}.jpg"
                     with open(os.path.join(out, img_name), 'wb') as f:
                         f.write(jpeg_bytes(Image.fromarray(sprite), 84))
@@ -430,7 +434,7 @@ def build(out, only=None):
                              mask=(dict(frac=round(float(mask.mean()), 3),
                                         source=pretty_mask_source(mrec.get('source')))
                                    if mask is not None else None),
-                             positions=(dict(n=len(positions),
+                             positions=(dict(n=len(positions), sets=[len(st) for st in sets if st],
                                              empty=empty_reason(prec.get('deliberately_empty')))
                                         if prel in files else None),
                              notes=notes_of(mrec), img=img_name,
@@ -439,16 +443,24 @@ def build(out, only=None):
                                          url=f"https://github.com/{tel['gh']}/raw/main/{quote(f)}")
                                     for f in bfiles])
                     L['bands'].append(B)
+                    d = dl.setdefault(base_band(band), [0, 0])
+                    d[0] += 1
+                    d[1] += sum(os.path.getsize(ab(f)) for f in bfiles)
                     s_entry['bands'].add(base_band(band))
                     if 'thumb' not in L or (CARD_BAND.index(base_band(band)) if base_band(band) in CARD_BAND else 99) < L['_tb']:
                         L['thumb'] = 'data:image/jpeg;base64,' + base64.b64encode(jpeg_bytes(thumb, 78)).decode()
                         L['_tb'] = CARD_BAND.index(base_band(band)) if base_band(band) in CARD_BAND else 99
                     print(f"  {tel['short']:4s} {sample:13s} {lens:12s} {band:9s} {n}px", flush=True)
                 L.pop('_tb', None)
+                if L['category']:
+                    s_entry['categories'][L['category']] = s_entry['categories'].get(L['category'], 0) + 1
                 cat['lenses'].append(L)
                 s_entry['lenses'].append(L['token'])
             s_entry['bands'] = sorted(s_entry['bands'], key=lambda b: PIVOT.get(b, 9))
             s_entry['band_colours'] = {b: band_colour(b) for b in s_entry['bands']}
+            s_entry['downloads'] = [dict(filter=f, bands=n, size=human(nb)) for f, (n, nb) in
+                                    sorted(dl.items(), key=lambda t: PIVOT.get(t[0], 9))]
+            s_entry['download_total'] = human(sum(nb for _, nb in dl.values()))
             if s_entry['lenses']:
                 cat['samples'].append(s_entry)
                 tel_entry['samples'].append(sample)
