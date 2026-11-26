@@ -44,6 +44,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }   /* .lightbox's display: grid would else override the hidden attribute and dim the whole page */
 body { background: var(--bg); color: var(--fg); font: 400 var(--s0)/1.55 var(--f-body); }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--raise); }
 a { color: inherit; }
