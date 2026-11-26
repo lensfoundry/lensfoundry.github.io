@@ -173,6 +173,38 @@ def short_cite(source):
     return m.group(0) if m else None
 
 
+# ADS abstract pages for the papers the catalogue cites (short_cite form -> bibcode).
+_CITE_BIBCODES = {
+    'Auger+2009': '2009ApJ...705.1099A',       # SLACS IX
+    'Brownstein+2012': '2012ApJ...744...41B',  # BELLS I
+    'Shu+2016': '2016ApJ...833..264S',         # BELLS GALLERY IV
+    'Sonnenfeld+2013': '2013ApJ...777...97S',  # SL2S III
+    'Sheu+2025': '2025MNRAS.541....1S',        # Project Dinos II
+    'Brewer+2012': '2012MNRAS.422.3574B',      # SWELLS III
+    'Treu+2011': '2011MNRAS.417.1601T',        # SWELLS I
+    'Gavazzi+2014': '2014ApJ...785..144G',
+    'DESI DR1': '2024AJ....168...58D',
+}
+
+
+def cite_obj(row, key=None):
+    """{'text', 'url'} for a catalogue value's citation: the row's own per-field source
+    (`key`, a dict like zlens_src or a free-text string) where set, else the row-level
+    source short-formed. url is the paper's ADS page where known."""
+    v = row.get(key) if key else None
+    if isinstance(v, dict):
+        text = v.get('cite') or short_cite(v.get('source'))
+    elif isinstance(v, str):
+        text = v
+    else:
+        text = None
+    text = text or short_cite(row.get('source'))
+    if not text:
+        return None
+    bib = _CITE_BIBCODES.get(text)
+    return dict(text=text, url=f'https://ui.adsabs.harvard.edu/abs/{bib}/abstract' if bib else None)
+
+
 def band_colour(band):
     lam = PIVOT.get(base_band(band))
     if lam is None:
@@ -427,20 +459,22 @@ def build(out, only=None):
                 L['zl'] = er.get('zlens', entry.get('redshift_lens'))
                 L['zs'] = er.get('zsrc', entry.get('redshift_source'))
                 L['sigma'] = er.get('sigma_kms')
-                # provenance for the catalogue numbers (the citation the page shows under
-                # each): the row's own per-field _src where set (e.g. J1419+5117's DESI
-                # lens redshift), else the row-level source short-formed.
-                L['zl_src'] = er.get('zlens_src') or short_cite(er.get('source'))
-                L['zs_src'] = er.get('zsrc_src') or short_cite(er.get('source'))
-                L['sigma_src'] = er.get('sigma_src') or short_cite(er.get('source'))
+                # provenance for the catalogue numbers (the linked citation the page shows
+                # under each): the row's own per-field _src where set (e.g. J1419+5117's
+                # DESI lens redshift), else the row-level source short-formed.
+                L['zl_src'] = cite_obj(er, 'zlens_src')
+                L['zs_src'] = cite_obj(er, 'zsrc_src')
+                L['sigma_src'] = cite_obj(er, 'sigma_src')
                 L['zl_kind'] = er.get('zlens_kind')
                 L['zs_kind'] = er.get('zsrc_kind')
-                zp = er.get('zsrc_photoz_ref')   # reference-only photometric z
-                L['zs_photoz'] = (dict(value=zp['value'], cite=short_cite(zp.get('source')))
-                                  if isinstance(zp, dict) else None)
+                # reference-only photometric z (J0223-0651): only where the row carries one
+                L['zs_photoz'] = None
+                if isinstance(er.get('zsrc_photoz_ref'), dict):
+                    L['zs_photoz'] = cite_obj(er, 'zsrc_photoz_ref')
+                    L['zs_photoz']['value'] = er['zsrc_photoz_ref'].get('value')
                 te = er.get('theta_e_arcsec')
                 L['theta_e'] = te
-                L['theta_e_src'] = short_cite(er.get('source'))
+                L['theta_e_src'] = cite_obj(er)
                 if tel['key'] == 'jwst' and lens in JWST_THETA_E:
                     L['theta_e'], L['theta_e_src'] = JWST_THETA_E[lens]
                 ldirs = {d.split('/')[-1]: d for d in stamp_dirs if d.split('/')[-2] == lens}

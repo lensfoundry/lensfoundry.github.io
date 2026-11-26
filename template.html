@@ -147,6 +147,8 @@ button.chip[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 0
 .lens-facts dt { font-size: var(--s-1); color: var(--muted); }
 .lens-facts dd { margin: 2px 0 0; font: 500 var(--s1)/1.3 var(--f-mono); }
 .lens-facts dd small { display: block; font: 400 var(--s-1)/1.3 var(--f-body); color: var(--muted); }
+.lens-facts small a { color: var(--muted); text-underline-offset: 3px; text-decoration-color: var(--faint); }
+.lens-facts small a:hover { color: var(--fg); }
 .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .tab { display: flex; align-items: center; gap: 8px; background: var(--raise); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; cursor: pointer; text-align: left; }
 .tab::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
@@ -242,6 +244,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const lensBy = Object.fromEntries(CAT.lenses.map(L => [L.token, L]));
 const sampleBy = Object.fromEntries(CAT.samples.map(S => [S.key, S]));
 const telBy = Object.fromEntries(CAT.telescopes.map(T => [T.key, T]));
+const cite = c => !c ? '' : (c.url ? `<a href="${c.url}" target="_blank" rel="noopener">${esc(c.text)}</a>` : esc(c.text));
 const PANELS = [
   ['Image', 'The science stamp, asinh stretch.'],
   ['Lensed light', 'Deflector removed with an elliptical-isophote model, in S/N and lightly smoothed: red is light the model lacks. A viewing aid.'],
@@ -436,10 +439,11 @@ function lensView() {
   const notes = [L.note, ...B.notes].filter(Boolean);
   const files = B.files.map(f => `<tr><td class="mono">${esc(f.name)}</td><td>${esc(f.size)}</td><td><a href="${f.url}" target="_blank" rel="noopener">${esc(f.where || 'GitHub ↗')}</a></td></tr>`).join('');
   const dl = B.archive ? `<div class="dl">
-      <p><b>Download is a full archive, not single files.</b> This band ships inside
-      <b>${esc(B.archive.name)}</b> — <b>${esc(B.archive.size)}</b>, every ${esc(S.title)} ${esc(B.label)} band, whatever the category.</p>
+      <p><b>Download is a full archive, not single files.</b> ${S.download_all && S.download_all.archive !== B.archive.name
+        ? `${esc(B.archive.name)} holds every ${esc(S.title)} ${esc(B.label.replace(/ \(visit \d\)/, ''))} band, whatever the category; ${esc(S.download_all.archive)} holds every ${esc(S.title)} band.`
+        : `${esc(B.archive.name)} holds every ${esc(S.title)} band.`}</p>
       <p class="dl-btns"><a class="btn" href="${B.archive.url}" target="_blank" rel="noopener">Download ${esc(B.archive.name)} · ${esc(B.archive.size)} ↗</a>
-      ${S.download_all ? `<a class="btn quiet" href="${S.download_all.url}" target="_blank" rel="noopener">Whole sample · ${esc(S.download_all.size)} ↗</a>` : ''}</p>
+      ${S.download_all && S.download_all.archive !== B.archive.name ? `<a class="btn" href="${S.download_all.url}" target="_blank" rel="noopener">Download ${esc(S.download_all.archive)} · ${esc(S.download_all.size)} ↗</a>` : ''}</p>
     </div>` : '';
   return `<section class="lens-top">
       <div><p class="eyebrow">${esc(telBy[L.telescope].name)} · ${esc(S.title)}</p><h1>${esc(L.name)}</h1></div>
@@ -450,10 +454,10 @@ function lensView() {
     </section>
     <dl class="lens-facts">
       <div><dt>Position (ICRS)</dt><dd>${esc(L.radec || '–')}</dd></div>
-      <div><dt>Lens redshift</dt><dd>${fmt.z(L.zl)}${L.zl_src && L.zl != null ? `<small>${esc(L.zl_src)}${L.zl_kind === 'spec' ? ' · spectroscopic' : ''}</small>` : ''}</dd></div>
-      <div><dt>Source redshift</dt><dd>${fmt.z(L.zs)}${L.zs != null && L.zs_src ? `<small>${esc(L.zs_src)}${L.zs_kind === 'spec' ? ' · spectroscopic' : ''}</small>` : ''}${L.zs == null && L.zs_photoz ? `<small>No spectroscopic measurement; photometric z&nbsp;=&nbsp;${L.zs_photoz.value} reported (${esc(L.zs_photoz.cite || 'literature')}), reference only.</small>` : ''}</dd></div>
-      <div><dt>Einstein radius</dt><dd>${fmt.te(L.theta_e)}${L.theta_e_src ? `<small>${esc(L.theta_e_src)}</small>` : ''}</dd></div>
-      ${L.sigma ? `<div><dt>Velocity dispersion</dt><dd>${L.sigma} km/s${L.sigma_src ? `<small>${esc(L.sigma_src)}</small>` : ''}</dd></div>` : ''}
+      <div><dt>Lens redshift</dt><dd>${fmt.z(L.zl)}${L.zl_src && L.zl != null ? `<small>${cite(L.zl_src)}${L.zl_kind === 'spec' ? ' · spectroscopic' : ''}</small>` : ''}</dd></div>
+      <div><dt>Source redshift</dt><dd>${fmt.z(L.zs)}${L.zs != null && L.zs_src ? `<small>${cite(L.zs_src)}${L.zs_kind === 'spec' ? ' · spectroscopic' : ''}</small>` : ''}${L.zs == null && L.zs_photoz ? `<small>No spectroscopic measurement; photometric z&nbsp;=&nbsp;${L.zs_photoz.value} reported (${cite(L.zs_photoz)}), reference only.</small>` : ''}</dd></div>
+      <div><dt>Einstein radius</dt><dd>${fmt.te(L.theta_e)}${L.theta_e_src ? `<small>${cite(L.theta_e_src)}</small>` : ''}</dd></div>
+      ${L.sigma ? `<div><dt>Velocity dispersion</dt><dd>${L.sigma} km/s${L.sigma_src ? `<small>${cite(L.sigma_src)}</small>` : ''}</dd></div>` : ''}
       ${L.category ? `<div><dt>Category</dt><dd>${catLabel(L.category)}<small>${L.band_mode ? esc(MODES[L.band_mode][0]) : ''}${L.category_reason ? (L.band_mode ? '. ' : '') + esc(L.category_reason.replace(/\s*\(Sam[^)]*\)/g, '')) : ''}${L.gold ? '. Etherington et al. 2022 Gold' : ''}</small></dd></div>` : ''}
     </dl>
     <div class="tabs" role="tablist" aria-label="Filter">${tabs}</div>
