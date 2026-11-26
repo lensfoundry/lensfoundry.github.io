@@ -152,9 +152,12 @@ button.chip[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 0
 .tab b { font: 500 var(--s0)/1.1 var(--f-mono); }
 .tab small { display: block; color: var(--muted); font-size: 11px; }
 .tab[aria-selected="true"] { border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
-.panels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-figure { margin: 0; display: grid; gap: 6px; min-width: 0; }
-.plate { position: relative; width: 100%; aspect-ratio: 1; max-width: 100%; background-color: var(--plate); background-size: 400% 100%; background-repeat: no-repeat; border-radius: 5px; cursor: zoom-in; border: 0; padding: 0; display: block; }
+.panels { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; align-items: start; }
+figure { margin: 0; display: grid; gap: 6px; min-width: 0; align-content: start; }
+/* align-items/content: start is load-bearing, not cosmetic: with the default stretch, the
+   tallest figure (longest figcaption) stretches the row, the stretch chains into the plate's
+   height, and aspect-ratio then makes the plate WIDER than its column (2026-11-26 bug). */
+.plate { position: relative; width: 100%; aspect-ratio: 1; max-width: 100%; background-color: var(--plate); background-size: 500% 100%; background-repeat: no-repeat; border-radius: 5px; cursor: zoom-in; border: 0; padding: 0; display: block; }
 figcaption { font-size: var(--s-1); color: var(--muted); line-height: 1.4; }
 figcaption b { color: var(--fg); font-weight: 600; }
 .bar { position: absolute; left: 8px; bottom: 8px; display: grid; gap: 3px; justify-items: center; color: #fff; font: 500 11px/1 var(--f-mono); text-shadow: 0 0 3px #000, 0 0 2px #000; pointer-events: none; }
@@ -237,8 +240,9 @@ const telBy = Object.fromEntries(CAT.telescopes.map(T => [T.key, T]));
 const PANELS = [
   ['Image', 'The science stamp, asinh stretch.'],
   ['Lensed light', 'Deflector removed with an elliptical-isophote model, in S/N and lightly smoothed: red is light the model lacks. A viewing aid.'],
+  ['Masked S/N', 'The science image divided by the noise map, contaminant mask applied — what a fit sees.'],
   ['Noise map', '1σ per pixel, log scale. Streaks are masked cosmic rays and bad columns.'],
-  ['PSF', 'The point-spread function kernel, log scale from 10⁻⁴ of the peak.'],
+  ['PSF', 'The point-spread function kernel, log scale from 10⁻⁴ of the peak, shown on a field twice the kernel width.'],
 ];
 const state = { view: 'home', sample: null, lens: null, band: null, filter: '', bands: new Set(), cats: new Set(), mode: '', sort: 'category' };
 const CATS = {
@@ -404,10 +408,11 @@ const COMPASS = `<svg class="compass" viewBox="0 0 38 38" aria-hidden="true"><g 
   <text x="27" y="7">N</text><text x="0" y="34">E</text></g></svg>`;
 
 function plate(B, i, big = false) {
-  const pos = `${(i * 100 / 3).toFixed(4)}% 0`;
-  const scalebar = i < 3 ? `<span class="bar"><i style="width:${(100 / B.size).toFixed(3)}cqw"></i>1″</span>` : '';
+  const pos = `${(i * 100 / (PANELS.length - 1)).toFixed(4)}% 0`;
+  const sky = i < PANELS.length - 1;   // every panel is sky except the last (the PSF)
+  const scalebar = sky ? `<span class="bar"><i style="width:${(100 / B.size).toFixed(3)}cqw"></i>1″</span>` : '';
   return `<button class="plate" data-panel="${i}" ${big ? 'data-close="1"' : ''} style="background-image:url('${B.img}');background-position:${pos};container-type:inline-size"
-    aria-label="${esc(PANELS[i][0])}, ${esc(B.label)}">${i < 3 ? COMPASS : ''}${scalebar}</button>`;
+    aria-label="${esc(PANELS[i][0])}, ${esc(B.label)}">${sky ? COMPASS : ''}${scalebar}</button>`;
 }
 
 function lensView() {

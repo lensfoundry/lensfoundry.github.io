@@ -8,7 +8,7 @@ positions under data/stamps/, and the info/ JSONs), so the browser shows exactly
 carries. Writes
 
     <out>/index.html            the page: template.html with the catalogue embedded as JSON
-    <out>/img/<lens>__<band>.jpg one sprite per band: image | lensed light | noise | PSF
+    <out>/img/<lens>__<band>.jpg one sprite per band: image | lensed light | masked S/N | noise | PSF
 
 The HST stamps sit at data/stamps/<sample>/<band_mode>/<category>/<lens>/<band>/ (since
 2026-11-02), the JWST ones still at data/stamps/<sample>/<lens>/<band>/; the lens and band are
@@ -96,6 +96,9 @@ PIVOT = {'F438W': 0.433, 'F475X': 0.494, 'F555W': 0.536, 'F606W': 0.589, 'F600LP
 # Which band a lens card shows: reddest optical for HST, LW for JWST.
 CARD_BAND = ['F814W', 'F606W', 'F555W', 'F600LP', 'F475X', 'F160W', 'F438W',
              'F444W', 'F277W', 'F356W', 'F200W', 'F150W', 'F115W']
+
+# Preferred sample display order on the home page (slacs and gallery first, Sam 2026-11-26).
+SAMPLE_ORDER = ['slacs', 'gallery']
 
 INSTRUMENT = {'ACS/WFC': 'ACS/WFC', 'WFPC2/WF3': 'WFPC2 (WF3 chip)', 'WFPC2/PC': 'WFPC2 (WF3 chip)',
               'WFC3/IR': 'WFC3/IR', 'WFC3/UVIS': 'WFC3/UVIS',
@@ -226,7 +229,6 @@ def panels(sci, noise, psf, mask, position_sets_px, theta_px, scale, centre=None
     # GUI's own view), on the S/N image, lightly smoothed; red = light the model lacks.
     snr = np.where(finite, (sci - sky) / np.where(noise > 0, noise, np.inf), 0.0)
     res, vdiv = isophote_model.isophote_display(snr, scale, exclude=mask | ~finite, centre=centre)
-
     def over(ax):
         if mask.any():
             shade = np.zeros(mask.shape + (4,))
@@ -246,18 +248,29 @@ def panels(sci, noise, psf, mask, position_sets_px, theta_px, scale, centre=None
                         path_effects=[pe.Stroke(linewidth=4.5, foreground='black'), pe.Normal()])
     p2 = render(np.nan_to_num(res, nan=0), 'RdBu_r', -vdiv, vdiv, over)
 
-    # 3. noise map, log
+    # 3. masked S/N: what a fit sees -- the science image over the noise map, with the
+    # contaminant mask applied.
+    a_snr = 2.0
+    lsnr = np.arcsinh(np.where(mask, np.nan, snr) / a_snr)
+    finite_snr = lsnr[np.isfinite(lsnr)]
+    snr_hi = np.nanpercentile(finite_snr, 99.5) if finite_snr.size else 1.0
+    p3 = render(np.nan_to_num(lsnr, nan=-2), 'inferno', np.arcsinh(-1.0 / a_snr), snr_hi)
+
+    # 4. noise map, log
     nz = np.where(finite, noise, np.nan)
     ln = np.log10(nz)
-    p3 = render(np.nan_to_num(ln, nan=np.nanmax(ln)), 'cividis',
+    p4 = render(np.nan_to_num(ln, nan=np.nanmax(ln)), 'cividis',
                 np.nanpercentile(ln, 1), np.nanpercentile(ln, 99.5))
 
-    # 4. PSF, log of peak-normalised
+    # 5. PSF, log of peak-normalised, padded to a field twice the kernel width so the core
+    # does not fill the panel (a 19 px kernel at 480 px otherwise reads as giant blocks).
     k = psf / np.nanmax(psf)
+    pad = k.shape[0] // 2
+    k = np.pad(k, pad)
     lk = np.log10(np.clip(k, 1e-4, None))
-    p4 = render(lk, 'inferno', -4, 0)
+    p5 = render(lk, 'inferno', -4, 0)
 
-    sprite = np.concatenate([p1, p2, p3, p4], axis=1)
+    sprite = np.concatenate([p1, p2, p3, p4, p5], axis=1)
     # card thumbnail: central half of the image panel
     c0 = PANEL // 4
     thumb = Image.fromarray(p1[c0:PANEL - c0, c0:PANEL - c0]).resize((THUMB, THUMB), Image.LANCZOS)
@@ -504,6 +517,10 @@ def build(out, only=None):
             if s_entry['lenses']:
                 cat['samples'].append(s_entry)
                 tel_entry['samples'].append(sample)
+        # Preferred display order: the flagship samples first (Sam, 2026-11-26), the rest
+        # in their manifest order.
+        tel_entry['samples'].sort(key=lambda s: (SAMPLE_ORDER.index(s) if s in SAMPLE_ORDER
+                                                 else len(SAMPLE_ORDER)))
         cat['telescopes'].append(tel_entry)
 
     html = open(os.path.join(HERE, 'template.html')).read()
