@@ -136,14 +136,20 @@ def dig(d, *keys):
     return d
 
 
-def band_files_link(tel, zarch, sample, band, path):
-    """Link fields for one data file's row. HST: the smallest Zenodo archive holding the
-    file (the per-(sample, filter) zip, else the sample zip). JWST: the raw file on
-    GitHub until its record exists."""
-    if zarch:
-        for name in (f"{sample}_{band.split('_')[0]}.zip", f'{sample}_all.zip'):
-            if name in zarch:
-                return dict(url=zarch[name]['url'], where='Zenodo ↗')
+def band_archive(zarch, sample, band):
+    """The smallest Zenodo archive holding this band, as a display dict, or None for a
+    telescope with no record yet: the per-(sample, filter) zip, else the sample zip
+    (bells, one filter, has only bells_all.zip)."""
+    for name in (f"{sample}_{band.split('_')[0]}.zip", f'{sample}_all.zip'):
+        if name in zarch:
+            row = zarch[name]
+            return dict(name=name, url=row['url'], size=human(int(row['size_bytes'])))
+    return None
+
+
+def gh_link(tel, path):
+    """A browse-the-file-on-GitHub link for one data file (genuine per-file view; the
+    big archive download is presented separately, not behind a file name)."""
     return dict(url=f"https://github.com/{tel['gh']}/raw/main/{quote(path)}", where='GitHub ↗')
 
 
@@ -159,6 +165,12 @@ def band_label(band):
 
 def base_band(band):
     return band.split('_')[0].upper()
+
+
+def short_cite(source):
+    """'Auger+2009' from a catalogue row's free-text source, for a compact citation."""
+    m = re.search(r"[A-Z][A-Za-zéë'()-]+\+\d{4}", source or '')
+    return m.group(0) if m else None
 
 
 def band_colour(band):
@@ -415,9 +427,20 @@ def build(out, only=None):
                 L['zl'] = er.get('zlens', entry.get('redshift_lens'))
                 L['zs'] = er.get('zsrc', entry.get('redshift_source'))
                 L['sigma'] = er.get('sigma_kms')
+                # provenance for the catalogue numbers (the citation the page shows under
+                # each): the row's own per-field _src where set (e.g. J1419+5117's DESI
+                # lens redshift), else the row-level source short-formed.
+                L['zl_src'] = er.get('zlens_src') or short_cite(er.get('source'))
+                L['zs_src'] = er.get('zsrc_src') or short_cite(er.get('source'))
+                L['sigma_src'] = er.get('sigma_src') or short_cite(er.get('source'))
+                L['zl_kind'] = er.get('zlens_kind')
+                L['zs_kind'] = er.get('zsrc_kind')
+                zp = er.get('zsrc_photoz_ref')   # reference-only photometric z
+                L['zs_photoz'] = (dict(value=zp['value'], cite=short_cite(zp.get('source')))
+                                  if isinstance(zp, dict) else None)
                 te = er.get('theta_e_arcsec')
                 L['theta_e'] = te
-                L['theta_e_src'] = (er.get('source') or '').split(',')[0] or None
+                L['theta_e_src'] = short_cite(er.get('source'))
                 if tel['key'] == 'jwst' and lens in JWST_THETA_E:
                     L['theta_e'], L['theta_e_src'] = JWST_THETA_E[lens]
                 ldirs = {d.split('/')[-1]: d for d in stamp_dirs if d.split('/')[-2] == lens}
@@ -460,6 +483,7 @@ def build(out, only=None):
                     instr = dig(inst_j, sample, lens, band)
                     prec = dig(pos_j, sample, lens, band) or {}
                     mrec = dig(mask_j, sample, lens, band) or {}
+                    barchive = band_archive(zarch, sample, band) if zarch else None
                     B = dict(band=band, label=band_label(band), colour=band_colour(band),
                              pivot=PIVOT.get(base_band(band)),
                              instrument=INSTRUMENT.get(instr, instr), npix=n,
@@ -475,9 +499,10 @@ def build(out, only=None):
                                              empty=empty_reason(prec.get('deliberately_empty')))
                                         if prel in files else None),
                              notes=notes_of(mrec), img=img_name,
+                             archive=barchive,
                              files=[dict(name=os.path.basename(f),
                                          size=human(os.path.getsize(ab(f))),
-                                         **band_files_link(tel, zarch, sample, band, f))
+                                         **gh_link(tel, f))
                                     for f in bfiles])
                     L['bands'].append(B)
                     d = dl.setdefault(base_band(band), [0, 0])

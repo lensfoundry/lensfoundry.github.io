@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>lensfoundry Lens Browser</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -185,6 +186,10 @@ figcaption b { color: var(--fg); font-weight: 600; }
 .files td:nth-child(2) { text-align: right; color: var(--muted); padding-right: 14px; white-space: nowrap; }
 .files td:last-child { text-align: right; white-space: nowrap; }
 .files a { color: var(--accent); text-underline-offset: 3px; }
+.dl { background: var(--raise); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; display: grid; gap: 8px; font-size: var(--s-1); }
+.dl-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.dl .btn { background: var(--accent); color: var(--accent-ink); border: 0; font-weight: 600; text-decoration: none; display: inline-block; }
+.dl .btn.quiet { background: var(--bg); color: var(--fg); border: 1px solid var(--line); font-weight: 400; }
 .tablewrap { overflow-x: auto; }
 
 /* lightbox */
@@ -430,6 +435,12 @@ function lensView() {
     : `None, deliberately${B.positions.empty ? `<br><small>${esc(B.positions.empty)}</small>` : ''}`;
   const notes = [L.note, ...B.notes].filter(Boolean);
   const files = B.files.map(f => `<tr><td class="mono">${esc(f.name)}</td><td>${esc(f.size)}</td><td><a href="${f.url}" target="_blank" rel="noopener">${esc(f.where || 'GitHub ↗')}</a></td></tr>`).join('');
+  const dl = B.archive ? `<div class="dl">
+      <p><b>Download is a full archive, not single files.</b> This band ships inside
+      <b>${esc(B.archive.name)}</b> — <b>${esc(B.archive.size)}</b>, every ${esc(S.title)} ${esc(B.label)} band, whatever the category.</p>
+      <p class="dl-btns"><a class="btn" href="${B.archive.url}" target="_blank" rel="noopener">Download ${esc(B.archive.name)} · ${esc(B.archive.size)} ↗</a>
+      ${S.download_all ? `<a class="btn quiet" href="${S.download_all.url}" target="_blank" rel="noopener">Whole sample · ${esc(S.download_all.size)} ↗</a>` : ''}</p>
+    </div>` : '';
   return `<section class="lens-top">
       <div><p class="eyebrow">${esc(telBy[L.telescope].name)} · ${esc(S.title)}</p><h1>${esc(L.name)}</h1></div>
       <div class="stepper">
@@ -439,10 +450,10 @@ function lensView() {
     </section>
     <dl class="lens-facts">
       <div><dt>Position (ICRS)</dt><dd>${esc(L.radec || '–')}</dd></div>
-      <div><dt>Lens redshift</dt><dd>${fmt.z(L.zl)}</dd></div>
-      <div><dt>Source redshift</dt><dd>${fmt.z(L.zs)}</dd></div>
+      <div><dt>Lens redshift</dt><dd>${fmt.z(L.zl)}${L.zl_src && L.zl != null ? `<small>${esc(L.zl_src)}${L.zl_kind === 'spec' ? ' · spectroscopic' : ''}</small>` : ''}</dd></div>
+      <div><dt>Source redshift</dt><dd>${fmt.z(L.zs)}${L.zs != null && L.zs_src ? `<small>${esc(L.zs_src)}${L.zs_kind === 'spec' ? ' · spectroscopic' : ''}</small>` : ''}${L.zs == null && L.zs_photoz ? `<small>No spectroscopic measurement; photometric z&nbsp;=&nbsp;${L.zs_photoz.value} reported (${esc(L.zs_photoz.cite || 'literature')}), reference only.</small>` : ''}</dd></div>
       <div><dt>Einstein radius</dt><dd>${fmt.te(L.theta_e)}${L.theta_e_src ? `<small>${esc(L.theta_e_src)}</small>` : ''}</dd></div>
-      ${L.sigma ? `<div><dt>Velocity dispersion</dt><dd>${L.sigma} km/s</dd></div>` : ''}
+      ${L.sigma ? `<div><dt>Velocity dispersion</dt><dd>${L.sigma} km/s${L.sigma_src ? `<small>${esc(L.sigma_src)}</small>` : ''}</dd></div>` : ''}
       ${L.category ? `<div><dt>Category</dt><dd>${catLabel(L.category)}<small>${L.band_mode ? esc(MODES[L.band_mode][0]) : ''}${L.category_reason ? (L.band_mode ? '. ' : '') + esc(L.category_reason.replace(/\s*\(Sam[^)]*\)/g, '')) : ''}${L.gold ? '. Etherington et al. 2022 Gold' : ''}</small></dd></div>` : ''}
     </dl>
     <div class="tabs" role="tablist" aria-label="Filter">${tabs}</div>
@@ -467,8 +478,8 @@ function lensView() {
       <div class="side">
         ${notes.length ? `<div class="review"><h3>Review notes</h3>${notes.map(n => `<p>${esc(n)}</p>`).join('')}
           <small class="muted">Pixel positions quoted as (col, row) count from the bottom-left corner of these images.</small></div>` : ''}
-        <div><h3>Files</h3><div class="tablewrap"><table class="files"><tbody>${files}</tbody></table></div>
-        <p class="muted" style="font-size:var(--s-1);margin-top:8px">Zenodo download of the whole sample: coming with the first data release.</p></div>
+        <div>${dl}<h3>Files in this band folder</h3><div class="tablewrap"><table class="files"><tbody>${files}</tbody></table></div>
+        <p class="muted" style="font-size:var(--s-1);margin-top:8px">Browse single files on GitHub (right column); the Zenodo archives above are the way to bulk-download.</p></div>
       </div>
     </div>`;
 }
