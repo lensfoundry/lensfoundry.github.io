@@ -250,7 +250,7 @@ const PANELS = [
   ['Lensed light', 'Deflector removed with an elliptical-isophote model, in S/N and lightly smoothed: red is light the model lacks. A viewing aid.'],
   ['Masked S/N', 'The science image divided by the noise map, contaminant mask applied — what a fit sees.'],
   ['Noise map', '1σ per pixel, log scale. Streaks are masked cosmic rays and bad columns.'],
-  ['PSF', 'The point-spread function kernel, log scale from 10⁻⁴ of the peak, shown on a field twice the kernel width.'],
+  ['PSF', 'The point-spread function kernel, log scale from 10⁻⁴ of the peak, with its wings.'],
 ];
 const state = { view: 'home', sample: null, lens: null, band: null, filter: '', bands: new Set(), cats: new Set(), mode: '', sort: 'category' };
 const CATS = {
@@ -388,7 +388,7 @@ function catKey(S) {
 function downloads(S) {
   if (!S.downloads || !S.downloads.length) return '';
   const link = (d, text) => d.url ? `<a href="${d.url}" target="_blank" rel="noopener">${esc(text)} ↗</a>` : esc(text);
-  const all = S.download_all ? `<p class="muted">Release archives on Zenodo — the whole sample: ${link(S.download_all, S.download_all.archive)} <span class="mono">(${esc(S.download_all.size)})</span>${S.downloads.length > 1 ? ', or one filter at a time, whatever the category:' : '.'}</p>` : '';
+  const all = S.download_all ? `<p class="muted">Release archives on Zenodo — the whole sample: ${link(S.download_all, S.download_all.archive)} <span class="mono">(${esc(S.download_all.size)})</span>${S.downloads.length > 1 ? ', or one filter at a time:' : '.'}</p>` : '';
   const per = S.downloads.length > 1 ? S.downloads.map(d => `<li><span>${link(d, d.archive || d.filter)}</span><span class="mono">${d.bands} images · ${esc(d.size)}</span></li>`).join('') : '';
   return `<div class="downloads">${all}${per ? `<ul>${per}</ul>` : ''}</div>`;
 }
@@ -440,7 +440,7 @@ function lensView() {
   const files = B.files.map(f => `<tr><td class="mono">${esc(f.name)}</td><td>${esc(f.size)}</td><td><a href="${f.url}" target="_blank" rel="noopener">${esc(f.where || 'GitHub ↗')}</a></td></tr>`).join('');
   const dl = B.archive ? `<div class="dl">
       <p><b>Download is a full archive, not single files.</b> ${S.download_all && S.download_all.archive !== B.archive.name
-        ? `${esc(B.archive.name)} holds every ${esc(S.title)} ${esc(B.label.replace(/ \(visit \d\)/, ''))} band, whatever the category; ${esc(S.download_all.archive)} holds every ${esc(S.title)} band.`
+        ? `${esc(B.archive.name)} holds every ${esc(S.title)} ${esc(B.label.replace(/ \(visit \d\)/, ''))} band; ${esc(S.download_all.archive)} holds every ${esc(S.title)} band.`
         : `${esc(B.archive.name)} holds every ${esc(S.title)} band.`}</p>
       <p class="dl-btns"><a class="btn" href="${B.archive.url}" target="_blank" rel="noopener">Download ${esc(B.archive.name)} · ${esc(B.archive.size)} ↗</a>
       ${S.download_all && S.download_all.archive !== B.archive.name ? `<a class="btn" href="${S.download_all.url}" target="_blank" rel="noopener">Download ${esc(S.download_all.archive)} · ${esc(S.download_all.size)} ↗</a>` : ''}</p>

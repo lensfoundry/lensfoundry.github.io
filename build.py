@@ -5,7 +5,9 @@
 
 Reads ONLY files tracked in git in the two reduction repos (the stamps, masks, PSFs and
 positions under data/stamps/, and the info/ JSONs), so the browser shows exactly what a clone
-carries. Writes
+carries — with ONE exception: the PSF panel renders the full kernel (with wings) from the
+gitignored data/psf/ tree when it exists on disk, falling back to the trimmed stamp kernel
+otherwise. Writes
 
     <out>/index.html            the page: template.html with the catalogue embedded as JSON
     <out>/img/<lens>__<band>.jpg one sprite per band: image | lensed light | masked S/N | noise | PSF
@@ -250,7 +252,7 @@ HALO = [pe.Stroke(linewidth=3.2, foreground='black'), pe.Normal()]
 SET_COLOURS = ['#6ff0ff', '#ff86d8', '#a6f36a', '#ffb347']   # positions: source 1, 2, ...
 
 
-def panels(sci, noise, psf, mask, position_sets_px, theta_px, scale, centre=None):
+def panels(sci, noise, psf, mask, position_sets_px, theta_px, scale, centre=None, psf_full=None):
     n = sci.shape[0]
     finite = np.isfinite(sci) & np.isfinite(noise) & (noise < 1e7)
     sci = np.where(finite, sci, np.nan)
@@ -306,11 +308,13 @@ def panels(sci, noise, psf, mask, position_sets_px, theta_px, scale, centre=None
     p4 = render(np.nan_to_num(ln, nan=np.nanmax(ln)), 'cividis',
                 np.nanpercentile(ln, 1), np.nanpercentile(ln, 99.5))
 
-    # 5. PSF, log of peak-normalised, padded to a field twice the kernel width so the core
-    # does not fill the panel (a 19 px kernel at 480 px otherwise reads as giant blocks).
-    k = psf / np.nanmax(psf)
-    pad = k.shape[0] // 2
-    k = np.pad(k, pad)
+    # 5. PSF, log of peak-normalised. The FULL kernel from data/psf (with its wings) when
+    # it exists on disk; the trimmed stamp kernel otherwise, padded to twice its width so
+    # the core does not fill the panel as giant blocks.
+    k = (psf_full if psf_full is not None else psf)
+    k = k / np.nanmax(k)
+    if psf_full is None:
+        k = np.pad(k, k.shape[0] // 2)
     lk = np.log10(np.clip(k, 1e-4, None))
     p5 = render(lk, 'inferno', -4, 0)
 
@@ -510,7 +514,12 @@ def build(out, only=None):
                     theta_px = (L['theta_e'] / scale) if L.get('theta_e') else None
                     # a group-centred (multi_galaxy) stamp: model and θ_E circle on the deflector
                     dpix = isophote_model.deflector_pixel(ab(sci_rel)) if tel['key'] == 'hst' else None
-                    sprite, thumb = panels(sci, noise, psf, mask, position_sets, theta_px, scale, dpix)
+                    # the full PSF kernel (with wings) lives in the gitignored data/psf tree;
+                    # use it when on disk, else the trimmed stamp kernel
+                    full_rel = os.path.join(bdir.replace('data/stamps/', 'data/psf/', 1), 'psf_kernel.fits')
+                    psf_full = fits.getdata(ab(full_rel)).astype(float) if os.path.isfile(ab(full_rel)) else None
+                    sprite, thumb = panels(sci, noise, psf, mask, position_sets, theta_px, scale, dpix,
+                                           psf_full=psf_full)
                     img_name = f"img/{L['token']}__{band}.jpg"
                     with open(os.path.join(out, img_name), 'wb') as f:
                         f.write(jpeg_bytes(Image.fromarray(sprite), 84))
