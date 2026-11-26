@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Build the lensprep lens-image browser: one static page over the HST and JWST reductions.
+"""Build the lensfoundry lens-image browser: one static page over the HST and JWST reductions.
 
     uv run --project ../HST_lenses_data_reduction python build.py [--out _site] [--only LENS]
 
@@ -19,11 +19,13 @@ quoted in a review note counts from the bottom-left corner. The "lensed light" p
 an elliptical-isophote model of the deflector (the HST repo's scripts/isophote_model.py, the
 same view as its positions GUI): a finding aid, never photometry.
 
-Download links point at the files on GitHub until the Zenodo records exist; then the manifest
-replaces them (release plan, step 5).
+Download links for HST point at the Zenodo record (concept DOI 10.5281/zenodo.24052764),
+using the version-pinned URLs in the HST repo's info/zenodo_archives.csv (the step-5
+fetch manifest); JWST keeps GitHub raw links until its own record exists.
 """
 import argparse
 import base64
+import csv
 import io
 import json
 import os
@@ -113,12 +115,33 @@ def load(repo, rel):
     return json.load(open(path)) if os.path.isfile(path) else {}
 
 
+def load_zenodo_archives(repo):
+    """archive name -> {url, size_bytes} from the HST repo's step-5 fetch manifest
+    (info/zenodo_archives.csv; version-pinned Zenodo URLs). Empty when absent."""
+    path = os.path.join(repo, 'info', 'zenodo_archives.csv')
+    if not os.path.isfile(path):
+        return {}
+    with open(path) as f:
+        return {r['archive']: r for r in csv.DictReader(f)}
+
+
 def dig(d, *keys):
     for k in keys:
         if not isinstance(d, dict) or k not in d:
             return None
         d = d[k]
     return d
+
+
+def band_files_link(tel, zarch, sample, band, path):
+    """Link fields for one data file's row. HST: the smallest Zenodo archive holding the
+    file (the per-(sample, filter) zip, else the sample zip). JWST: the raw file on
+    GitHub until its record exists."""
+    if zarch:
+        for name in (f"{sample}_{band.split('_')[0]}.zip", f'{sample}_all.zip'):
+            if name in zarch:
+                return dict(url=zarch[name]['url'], where='Zenodo ↗')
+    return dict(url=f"https://github.com/{tel['gh']}/raw/main/{quote(path)}", where='GitHub ↗')
 
 
 def token(name):
@@ -344,6 +367,7 @@ def build(out, only=None):
     for tel in TELESCOPES:
         repo = tel['path']
         files = tracked(repo)
+        zarch = load_zenodo_archives(repo) if tel['key'] == 'hst' else {}
         samples = load(repo, 'samples/lens_samples.json')
         einstein = load(repo, 'catalogues/lens_einstein_radii.json')
         inst_j = load(repo, 'provenance/lens_instrument.json')
@@ -440,7 +464,7 @@ def build(out, only=None):
                              notes=notes_of(mrec), img=img_name,
                              files=[dict(name=os.path.basename(f),
                                          size=human(os.path.getsize(ab(f))),
-                                         url=f"https://github.com/{tel['gh']}/raw/main/{quote(f)}")
+                                         **band_files_link(tel, zarch, sample, band, f))
                                     for f in bfiles])
                     L['bands'].append(B)
                     d = dl.setdefault(base_band(band), [0, 0])
@@ -458,8 +482,24 @@ def build(out, only=None):
                 s_entry['lenses'].append(L['token'])
             s_entry['bands'] = sorted(s_entry['bands'], key=lambda b: PIVOT.get(b, 9))
             s_entry['band_colours'] = {b: band_colour(b) for b in s_entry['bands']}
-            s_entry['downloads'] = [dict(filter=f, bands=n, size=human(nb)) for f, (n, nb) in
-                                    sorted(dl.items(), key=lambda t: PIVOT.get(t[0], 9))]
+
+            def dl_url(filt):
+                """The Zenodo archive covering this (sample, filter), as (name, row), or
+                None for a telescope with no record yet. The per-filter zip is the smallest
+                archive holding it; bells (one filter) has only bells_all.zip. filt is the
+                uppercase base band ('F606W'); archive names keep the repo's case ('f606W')."""
+                for name in (f"{sample}_f{filt[1:]}.zip", f'{sample}_all.zip'):
+                    if name in zarch:
+                        return name, zarch[name]
+                return None, None
+
+            s_entry['downloads'] = [dict(filter=f, bands=n, size=human(nb),
+                                         archive=an, url=(row['url'] if row else None))
+                                    for f, (n, nb) in sorted(dl.items(), key=lambda t: PIVOT.get(t[0], 9))
+                                    for an, row in [dl_url(f)]]
+            all_name, all_row = f'{sample}_all.zip', zarch.get(f'{sample}_all.zip')
+            s_entry['download_all'] = dict(archive=all_name, url=all_row['url'],
+                                           size=human(int(all_row['size_bytes']))) if all_row else None
             s_entry['download_total'] = human(sum(nb for _, nb in dl.values()))
             if s_entry['lenses']:
                 cat['samples'].append(s_entry)

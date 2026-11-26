@@ -1,4 +1,4 @@
-<title>lensprep Lens Browser</title>
+<title>lensfoundry Lens Browser</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -131,6 +131,7 @@ button.chip[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 0
 .downloads ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--s-1); }
 .downloads li { display: inline-flex; gap: 8px; align-items: baseline; }
 .downloads .mono { color: var(--muted); }
+.downloads a { color: var(--accent); text-underline-offset: 3px; }
 .toolbar select:focus-visible { outline: 2px solid var(--focus); }
 
 /* lens view */
@@ -207,7 +208,7 @@ footer .wrap { display: grid; gap: 6px; }
 
 <header class="top">
   <div class="wrap">
-    <button class="brand" data-go="" aria-label="lensprep home"><b>lensprep</b><span>lens image browser</span></button>
+    <button class="brand" data-go="" aria-label="lensfoundry home"><b>lensfoundry</b><span>lens image browser</span></button>
     <span class="proto">Prototype</span>
     <nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
     <div class="search">
@@ -373,8 +374,10 @@ function catKey(S) {
 }
 function downloads(S) {
   if (!S.downloads || !S.downloads.length) return '';
-  const per = S.downloads.length > 1 ? S.downloads.map(d => `<li><span>${esc(d.filter)}</span><span class="mono">${d.bands} images · ${esc(d.size)}</span></li>`).join('') : '';
-  return `<div class="downloads"><p class="muted">Release archives (Zenodo, with the first data release): the whole sample, <span class="mono">${esc(S.download_total)}</span>${per ? ', or one filter at a time, whatever the category:' : '.'}</p>${per ? `<ul>${per}</ul>` : ''}</div>`;
+  const link = (d, text) => d.url ? `<a href="${d.url}" target="_blank" rel="noopener">${esc(text)} ↗</a>` : esc(text);
+  const all = S.download_all ? `<p class="muted">Release archives on Zenodo — the whole sample: ${link(S.download_all, S.download_all.archive)} <span class="mono">(${esc(S.download_all.size)})</span>${S.downloads.length > 1 ? ', or one filter at a time, whatever the category:' : '.'}</p>` : '';
+  const per = S.downloads.length > 1 ? S.downloads.map(d => `<li><span>${link(d, d.archive || d.filter)}</span><span class="mono">${d.bands} images · ${esc(d.size)}</span></li>`).join('') : '';
+  return `<div class="downloads">${all}${per ? `<ul>${per}</ul>` : ''}</div>`;
 }
 function lensGrid(S) {
   let Ls = S.lenses.map(t => lensBy[t]).filter(lensMatches);
@@ -420,7 +423,7 @@ function lensView() {
     : B.positions.n ? `<span class="mono">${B.positions.n}</span> images marked${B.positions.sets && B.positions.sets.length > 1 ? `<br><small>${B.positions.sets.length} sources: ${B.positions.sets.join(' + ')} images</small>` : ''}`
     : `None, deliberately${B.positions.empty ? `<br><small>${esc(B.positions.empty)}</small>` : ''}`;
   const notes = [L.note, ...B.notes].filter(Boolean);
-  const files = B.files.map(f => `<tr><td class="mono">${esc(f.name)}</td><td>${esc(f.size)}</td><td><a href="${f.url}" target="_blank" rel="noopener">GitHub ↗</a></td></tr>`).join('');
+  const files = B.files.map(f => `<tr><td class="mono">${esc(f.name)}</td><td>${esc(f.size)}</td><td><a href="${f.url}" target="_blank" rel="noopener">${esc(f.where || 'GitHub ↗')}</a></td></tr>`).join('');
   return `<section class="lens-top">
       <div><p class="eyebrow">${esc(telBy[L.telescope].name)} · ${esc(S.title)}</p><h1>${esc(L.name)}</h1></div>
       <div class="stepper">
@@ -468,8 +471,8 @@ function render() {
   crumbs();
   const v = $('#view');
   v.innerHTML = state.view === 'lens' ? lensView() : state.view === 'sample' ? sampleView() : home();
-  document.title = state.view === 'lens' ? `${lensBy[state.lens].name} · lensprep Lens Browser`
-    : state.view === 'sample' ? `${sampleBy[state.sample].title} · lensprep Lens Browser` : 'lensprep Lens Browser';
+  document.title = state.view === 'lens' ? `${lensBy[state.lens].name} · lensfoundry Lens Browser`
+    : state.view === 'sample' ? `${sampleBy[state.sample].title} · lensfoundry Lens Browser` : 'lensfoundry Lens Browser';
 }
 
 /* events */
