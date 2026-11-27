@@ -381,12 +381,15 @@ MOSAIC_KINDS = ('signal', 'snr', 'noise', 'psf')
 
 
 def mosaics_for_sample(repo, sample, out):
-    """{group: {kind: img relpath}} from the repo's tracked QC mosaics at
-    data/mosaics/<sample>/<group>_<kind>.png (HST carries these; JWST's data/mosaics holds
-    per-lens drizzle products, not QC panels, and globs empty). Re-encoded as JPEG for
-    the page — the PNGs run to several MB each."""
+    """{group: {kind: img relpath}} from the repo's tracked QC grids. HST keeps them at
+    data/mosaics/<sample>/<group>_<kind>.png; JWST at data/qc/<sample>/<FILTER>_<kind>.png
+    ('mosaic' names the Image3 product in the JWST repo). Re-encoded as JPEG for the
+    page — the PNGs run to several MB each."""
     found = {}
-    for path in sorted(glob.glob(os.path.join(repo, 'data', 'mosaics', sample, '*.png'))):
+    pngs = []
+    for sub in ('mosaics', 'qc'):
+        pngs += glob.glob(os.path.join(repo, 'data', sub, sample, '*.png'))
+    for path in sorted(pngs):
         stem = os.path.basename(path)[:-4]
         group, _, kind = stem.rpartition('_')
         if kind not in MOSAIC_KINDS or not group:
