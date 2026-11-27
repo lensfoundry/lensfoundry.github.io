@@ -1,11 +1,11 @@
 # lensfoundry.github.io
 
 Source of the lensfoundry lens-image browser: one static page over the HST and JWST strong-lens
-reductions ([HST_lenses_data_reduction](https://github.com/samlange04/HST_lenses_data_reduction),
+reductions ([lensfoundry-hst](https://github.com/lensfoundry/lensfoundry-hst),
 [JWST_lenses_data_reduction](https://github.com/samlange04/JWST_lenses_data_reduction)).
 
 ```bash
-uv run --project ../HST_lenses_data_reduction python build.py --out _site
+uv run --project ../lensfoundry-hst python build.py --out _site
 ```
 
 `build.py` reads only the files tracked in git in the two reduction checkouts beside this

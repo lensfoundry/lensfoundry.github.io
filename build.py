@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Build the lensfoundry lens-image browser: one static page over the HST and JWST reductions.
 
-    uv run --project ../HST_lenses_data_reduction python build.py [--out _site] [--only LENS]
+    uv run --project ../lensfoundry-hst python build.py [--out _site] [--only LENS]
 
 Reads ONLY files tracked in git in the two reduction repos (the stamps, masks, PSFs and
 positions under data/stamps/, and the info/ JSONs), so the browser shows exactly what a clone
@@ -49,15 +49,15 @@ from astropy.wcs.utils import proj_plane_pixel_scales
 HERE = os.path.dirname(os.path.abspath(__file__))
 CODE = os.path.dirname(HERE)
 import sys
-sys.path.insert(0, os.path.join(CODE, 'HST_lenses_data_reduction', 'scripts'))
+sys.path.insert(0, os.path.join(CODE, 'lensfoundry-hst', 'scripts'))
 import isophote_model  # noqa: E402
 PANEL = 480          # px per panel side in the sprite
 THUMB = 220          # px, lens-card thumbnail (central crop)
 
 TELESCOPES = [
     dict(key='hst', name='Hubble Space Telescope', short='HST',
-         path=os.path.join(CODE, 'HST_lenses_data_reduction'),
-         gh='samlange04/HST_lenses_data_reduction'),
+         path=os.path.join(CODE, 'lensfoundry-hst'),
+         gh='lensfoundry/lensfoundry-hst'),
     dict(key='jwst', name='James Webb Space Telescope', short='JWST',
          path=os.path.join(CODE, 'JWST_lenses_data_reduction'),
          gh='samlange04/JWST_lenses_data_reduction'),
