@@ -106,7 +106,7 @@ button.chip[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 0
 .samples { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .sample-card { display: grid; gap: 10px; text-align: left; background: var(--raise); border: 1px solid var(--line); border-radius: 8px; padding: 12px; cursor: pointer; min-width: 0; }
 .sample-card:hover { border-color: var(--faint); }
-.strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; border-radius: 4px; overflow: hidden; }   /* flush images, no plate/gap: empty cells stay card-coloured */
+.strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; border-radius: 4px; overflow: hidden; }   /* 3px gaps, no black plate: they show the card colour */
 .strip img { width: 100%; aspect-ratio: 1; display: block; object-fit: cover; }
 .sample-card h3 { font-size: var(--s2); }
 .sample-card .refs { font-size: var(--s-1); color: var(--muted); }
