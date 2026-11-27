@@ -74,7 +74,7 @@ SAMPLES = {
               'Brownstein et al. 2012'),
     'sl2s': ('SL2S', 'Grade-A lenses from the Strong Lensing Legacy Survey (SL2S), imaged in WFPC2 F606W or short WFC3/UVIS F475X + F600LP snapshots.',
              'Sonnenfeld et al. 2013'),
-    'dinos': ('SL2S + Project Dinos', 'SL2S lenses re-imaged in deep WFC3/UVIS F475X by Project Dinos II — a set disjoint from the plain SL2S sample.',
+    'dinos': ('SL2S + Project Dinos', 'SL2S lenses re-imaged in deep WFC3/UVIS F475X by Project Dinos II — a separate set to the plain SL2S sample.',
               'Sonnenfeld et al. 2013; Sheu et al. 2025'),
     'b1938': ('JVAS B1938+666', 'A radio-loud Einstein ring from the Jodrell Bank VLA Astrometric Survey (JVAS), 21 dithers per filter (~24 h each).',
               'GO 8281 (PI Vegetti)'),
