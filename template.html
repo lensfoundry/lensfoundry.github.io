@@ -24,7 +24,7 @@
   --f-display: "Spectral", "Iowan Old Style", Georgia, serif;
   --f-body: "IBM Plex Sans", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --s-1: 12px; --s0: 14px; --s1: 16px; --s2: 20px; --s3: 28px; --s4: 40px;
+  --s-1: 13px; --s0: 14px; --s1: 16px; --s2: 20px; --s3: 28px; --s4: 40px;
   --gutter-l: max(16px, env(safe-area-inset-left, 0px));
   --gutter-r: max(16px, env(safe-area-inset-right, 0px));
   color-scheme: dark;
@@ -60,7 +60,7 @@ button { font: inherit; color: inherit; }
 .brand { display: flex; align-items: baseline; gap: 10px; background: none; border: 0; padding: 0; cursor: pointer; }
 .brand b { font: 600 22px/1 var(--f-display); letter-spacing: 0.01em; }
 .brand span { font-size: var(--s-1); color: var(--muted); }
-.proto { font: 500 11px/1 var(--f-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent); padding: 4px 7px; border-radius: 3px; }
+.proto { font: 500 13px/1 var(--f-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent); padding: 4px 7px; border-radius: 3px; }
 .crumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--muted); font-size: var(--s-1); min-width: 0; }
 .crumbs button { background: none; border: 0; padding: 0; color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line); }
 .crumbs button:hover { color: var(--fg); }
@@ -87,6 +87,7 @@ p { margin: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; font: 500 var(--s-1)/1 var(--f-mono); padding: 4px 7px 4px 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); white-space: nowrap; }
 .chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.bandchip { min-width: 78px; justify-content: center; }   /* filter chips: one fixed size, not sized to the name */
 button.chip { cursor: pointer; }
 button.chip[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
 .dots { display: flex; gap: 4px; }
@@ -105,7 +106,7 @@ button.chip[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 0
 .samples { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .sample-card { display: grid; gap: 10px; text-align: left; background: var(--raise); border: 1px solid var(--line); border-radius: 8px; padding: 12px; cursor: pointer; min-width: 0; }
 .sample-card:hover { border-color: var(--faint); }
-.strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; background: var(--plate); border-radius: 4px; overflow: hidden; }
+.strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; border-radius: 4px; overflow: hidden; }   /* flush images, no plate/gap: empty cells stay card-coloured */
 .strip img { width: 100%; aspect-ratio: 1; display: block; object-fit: cover; }
 .sample-card h3 { font-size: var(--s2); }
 .sample-card .refs { font-size: var(--s-1); color: var(--muted); }
@@ -123,9 +124,9 @@ button.chip[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 0
 .lens-card:hover .pic { outline-color: var(--accent); }
 .lens-card .name { font: 500 var(--s0)/1.2 var(--f-mono); }
 .lens-card .meta { font: 400 var(--s-1)/1.3 var(--f-mono); color: var(--muted); }
-.flag { position: absolute; left: 6px; top: 6px; font: 500 10px/1 var(--f-body); letter-spacing: 0.06em; text-transform: uppercase; background: rgba(0,0,0,0.72); color: #e6e8ed; padding: 3px 5px; border-radius: 3px; }
+.flag { position: absolute; left: 6px; top: 6px; font: 500 12px/1 var(--f-body); letter-spacing: 0.06em; text-transform: uppercase; background: rgba(0,0,0,0.72); color: #e6e8ed; padding: 3px 5px; border-radius: 3px; }
 .empty { color: var(--muted); padding: var(--s3) 0; }
-.tag { position: absolute; left: 6px; bottom: 6px; font: 500 10px/1 var(--f-mono); letter-spacing: 0.04em; background: rgba(0,0,0,0.72); color: #e6e8ed; padding: 3px 5px; border-radius: 3px; }
+.tag { position: absolute; left: 6px; bottom: 6px; font: 500 12px/1 var(--f-mono); letter-spacing: 0.04em; background: rgba(0,0,0,0.72); color: #e6e8ed; padding: 3px 5px; border-radius: 3px; }
 .cat { display: inline-flex; align-items: center; gap: 6px; font: 500 var(--s-1)/1 var(--f-body); }
 .cat::before { content: ""; width: 9px; height: 9px; border-radius: 2px; background: var(--c); flex: none; }
 .cats { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); }
@@ -153,7 +154,7 @@ button.chip[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 0
 .tab { display: flex; align-items: center; gap: 8px; background: var(--raise); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; cursor: pointer; text-align: left; }
 .tab::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
 .tab b { font: 500 var(--s0)/1.1 var(--f-mono); }
-.tab small { display: block; color: var(--muted); font-size: 11px; }
+.tab small { display: block; color: var(--muted); font-size: 13px; }
 .tab[aria-selected="true"] { border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
 .panels { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; align-items: start; }
 figure { margin: 0; display: grid; gap: 6px; min-width: 0; align-content: start; }
@@ -163,7 +164,7 @@ figure { margin: 0; display: grid; gap: 6px; min-width: 0; align-content: start;
 .plate { position: relative; width: 100%; aspect-ratio: 1; max-width: 100%; background-color: var(--plate); background-size: 500% 100%; background-repeat: no-repeat; border-radius: 5px; cursor: zoom-in; border: 0; padding: 0; display: block; }
 figcaption { font-size: var(--s-1); color: var(--muted); line-height: 1.4; }
 figcaption b { color: var(--fg); font-weight: 600; }
-.bar { position: absolute; left: 8px; bottom: 8px; display: grid; gap: 3px; justify-items: center; color: #fff; font: 500 11px/1 var(--f-mono); text-shadow: 0 0 3px #000, 0 0 2px #000; pointer-events: none; }
+.bar { position: absolute; left: 8px; bottom: 8px; display: grid; gap: 3px; justify-items: center; color: #fff; font: 500 12px/1 var(--f-mono); text-shadow: 0 0 3px #000, 0 0 2px #000; pointer-events: none; }
 .bar i { display: block; height: 3px; background: #fff; box-shadow: 0 0 0 1px #000; }
 .compass { position: absolute; right: 6px; top: 6px; width: 38px; height: 38px; pointer-events: none; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--s-1); color: var(--muted); margin: 10px 0 0; }
@@ -194,9 +195,26 @@ figcaption b { color: var(--fg); font-weight: 600; }
 .dl .btn.quiet { background: var(--bg); color: var(--fg); border: 1px solid var(--line); font-weight: 400; }
 .tablewrap { overflow-x: auto; }
 
+/* definitions */
+.defs { display: grid; gap: var(--s1); padding-bottom: var(--s3); }
+.defs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.def { display: grid; gap: 6px; align-content: start; background: var(--raise); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.def p { font-size: var(--s-1); color: var(--muted); line-height: 1.5; }
+.def p b { color: var(--fg); font-weight: 500; }
+.def .cat { font-size: var(--s0); }
+.def code { font-family: var(--f-mono); font-size: var(--s-1); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+
+/* mosaics (sample view): the repo's QC mosaics, one row per filter group */
+.mosaics { display: grid; gap: 10px; padding-bottom: var(--s2); }
+.mos-grid { display: grid; grid-template-columns: max-content repeat(4, minmax(0, 1fr)); gap: 8px; align-items: center; }
+.mos-head { font-size: var(--s-1); color: var(--muted); text-align: center; }
+.mcell { display: block; width: 100%; aspect-ratio: 5/4; background-color: var(--plate); background-size: cover; background-position: center; border: 1px solid var(--line); border-radius: 5px; cursor: zoom-in; padding: 0; }
+.mcell:hover { border-color: var(--accent); }
+
 /* lightbox */
 .lightbox { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,0.88); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) var(--gutter-r) max(16px, env(safe-area-inset-bottom, 0px)) var(--gutter-l); }
 .lightbox .plate { width: min(88vw, 82vh); cursor: zoom-out; }
+.lightbox .full { max-width: 92vw; max-height: 78vh; border-radius: 6px; cursor: zoom-out; display: block; }
 .lightbox p { color: #c9ced8; font-size: var(--s-1); margin-top: 10px; text-align: center; }
 
 footer { border-top: 1px solid var(--line); padding-block: var(--s3); color: var(--muted); font-size: var(--s-1); }
@@ -254,9 +272,9 @@ const PANELS = [
 ];
 const state = { view: 'home', sample: null, lens: null, band: null, filter: '', bands: new Set(), cats: new Set(), mode: '', sort: 'category' };
 const CATS = {
-  prime: ['Prime', 'var(--cat-prime)', 'P', 'The cleanest systems.'],
+  prime: ['Prime', 'var(--cat-prime)', 'P', 'The cleanest systems: one deflector, marked image positions, spectroscopic redshifts, and no known complication.'],
   complex: ['Complex', 'var(--cat-complex)', 'C', 'Harder to model: difficult morphology, blended lens and source light, a low-S/N arc, a nearby companion or a second source.'],
-  limited: ['Limited', 'var(--cat-limited)', 'L', 'No marked image positions, or no lens or source redshift.'],
+  limited: ['Limited', 'var(--cat-limited)', 'L', 'No marked image positions, or no lens or source redshift — a photometric redshift also makes a lens limited.'],
   multi_galaxy: ['Multi-galaxy', 'var(--cat-multi)', 'MG', 'More than one deflector galaxy; 30″ stamps centred on the group.'],
 };
 const CAT_ORDER = Object.keys(CATS);
@@ -315,7 +333,7 @@ function home() {
         <div class="strip">${thumbs}</div>
         <div><h3>${esc(S.title)}</h3><p class="refs">${esc(S.refs)}</p></div>
         <p class="muted">${esc(S.blurb)}</p>
-        <div class="chips">${S.bands.map(b => `<span class="chip" style="--c:${S.band_colours[b]}">${b}</span>`).join('')}</div>
+        <div class="chips">${S.bands.map(b => `<span class="chip bandchip" style="--c:${S.band_colours[b]}">${b}</span>`).join('')}</div>
         ${Object.keys(S.categories || {}).length ? `<div class="cats">${CAT_ORDER.filter(c => S.categories[c]).map(c => `<span class="cat" style="--c:${CATS[c][1]}">${S.categories[c]} ${CATS[c][0].toLowerCase()}</span>`).join('')}</div>` : ''}
         <span class="count">${S.lenses.length} lenses · ${nb} images</span>
       </button>`;
@@ -336,8 +354,21 @@ function home() {
       <div><dt>Samples</dt><dd>${CAT.samples.length}</dd></div>
       <div><dt>Telescopes</dt><dd>${CAT.telescopes.length}</dd></div>
     </dl>
-    <p class="note">Prototype. Each sample is sorted into single- or multi-band lenses and four categories: prime, complex, limited and multi-galaxy. File links go to the copies in the GitHub repositories; the Zenodo records will add one archive per sample and one per sample and filter.</p>
-  </section>${tels}`;
+    <p class="note">Prototype. File links go to the copies in the GitHub repositories; whole samples and sample–filter sets download as Zenodo archives. Each sample page also carries the QC mosaics: every lens tiled by filter.</p>
+  </section>${definitions()}${tels}`;
+}
+
+function definitions() {
+  const cards = CAT_ORDER.map(c => `<div class="def">${catLabel(c)}<p>${esc(CATS[c][3])}</p></div>`).join('');
+  return `<section class="defs" aria-labelledby="defs-h">
+    <h2 id="defs-h">Definitions</h2>
+    <div class="defs-grid">${cards}
+      <div class="def"><span class="cat" style="--c:var(--muted)">Band mode</span>
+        <p><b>SB</b>, single band: observed in one filter. <b>MB</b>, multi-band: more than one filter (a split visit counts as one band).</p></div>
+      <div class="def"><span class="cat" style="--c:var(--muted)">Tags</span>
+        <p>Lens cards carry a tag of band mode then category — <code>MB-P</code> is a multi-band prime lens, <code>SB-L</code> a single-band limited one. Categories rank how hard a system is to model, not data quality; they are a judgement, with the reason recorded per lens.</p></div>
+    </div>
+  </section>`;
 }
 
 function lensMatches(L) {
@@ -357,6 +388,7 @@ function sampleView() {
     </section>
     ${catKey(S)}
     ${downloads(S)}
+    ${mosaics(S)}
     <div class="toolbar">
       <input id="filter" type="search" placeholder="Filter by name" value="${esc(state.filter)}" aria-label="Filter lenses by name">
       ${Object.keys(S.categories || {}).length ? `<div class="chips" role="group" aria-label="Show category">
@@ -368,7 +400,7 @@ function sampleView() {
         <option value="multi_band"${state.mode === 'multi_band' ? ' selected' : ''}>Multi-band</option>
       </select></label>` : ''}` : ''}
       <div class="chips" role="group" aria-label="Show lenses observed in">
-        ${S.bands.map(b => `<button class="chip" data-band="${b}" style="--c:${S.band_colours[b]}" aria-pressed="${state.bands.has(b)}">${b}</button>`).join('')}
+        ${S.bands.map(b => `<button class="chip bandchip" data-band="${b}" style="--c:${S.band_colours[b]}" aria-pressed="${state.bands.has(b)}">${b}</button>`).join('')}
       </div>
       <label>Sort <select id="sort">
         <option value="category"${state.sort === 'category' ? ' selected' : ''}>Category</option>
@@ -391,6 +423,20 @@ function downloads(S) {
   const all = S.download_all ? `<p class="muted">Release archives on Zenodo — the whole sample: ${link(S.download_all, S.download_all.archive)} <span class="mono">(${esc(S.download_all.size)})</span>${S.downloads.length > 1 ? ', or one filter at a time:' : '.'}</p>` : '';
   const per = S.downloads.length > 1 ? S.downloads.map(d => `<li><span>${link(d, d.archive || d.filter)}</span><span class="mono">${d.bands} images · ${esc(d.size)}</span></li>`).join('') : '';
   return `<div class="downloads">${all}${per ? `<ul>${per}</ul>` : ''}</div>`;
+}
+function mosaics(S) {
+  if (!S.mosaics || !Object.keys(S.mosaics).length) return '';
+  const kinds = [['signal', 'Signal'], ['snr', 'S/N'], ['noise', 'Noise'], ['psf', 'PSF']];
+  const rows = Object.entries(S.mosaics).map(([g, m]) => {
+    const cells = kinds.map(([k, label]) => m[k]
+      ? `<button class="mcell" style="background-image:url('${m[k]}')" data-mimg="${m[k]}" data-mlabel="${esc(S.title)} · ${esc(g.toUpperCase())} · ${label}" aria-label="${esc(g.toUpperCase())} ${label} mosaic"></button>`
+      : '<span></span>').join('');
+    return `<span class="chip bandchip" style="--c:${(S.mosaic_colours || {})[g] || '#888'}">${esc(g.toUpperCase())}</span>${cells}`;
+  }).join('');
+  return `<section class="mosaics" aria-labelledby="mos-h"><h3 id="mos-h">Mosaics — every lens in the sample, tiled</h3>
+    <p class="muted" style="font-size:var(--s-1)">Signal, signal-to-noise, noise map and PSF kernel, one panel per lens and filter. Click a panel to enlarge.</p>
+    <div class="mos-grid"><span></span>${kinds.map(([, l]) => `<span class="mos-head">${l}</span>`).join('')}${rows}</div>
+  </section>`;
 }
 function lensGrid(S) {
   let Ls = S.lenses.map(t => lensBy[t]).filter(lensMatches);
@@ -510,6 +556,8 @@ document.addEventListener('click', e => {
     c.setAttribute('aria-pressed', state.bands.has(b)); $('#grid').innerHTML = lensGrid(sampleBy[state.sample]); return; }
   const p = e.target.closest('.plate');
   if (p && !p.dataset.close) { openBox(+p.dataset.panel); return; }
+  const m = e.target.closest('[data-mimg]');
+  if (m) { openImgBox(m.dataset.mimg, m.dataset.mlabel); return; }
   if (e.target.closest('#lightbox')) { closeBox(); return; }
   if (!e.target.closest('.search')) closeResults();
 });
@@ -563,6 +611,11 @@ function openBox(i) {
   box.hidden = false;
 }
 function closeBox() { const b = $('#lightbox'); b.hidden = true; b.innerHTML = ''; }
+function openImgBox(src, label) {
+  const box = $('#lightbox');
+  box.innerHTML = `<div><img class="full" src="${src}" alt="${esc(label)}"><p>${esc(label)}. Click or press Esc to close.</p></div>`;
+  box.hidden = false;
+}
 
 go(location.hash.slice(1), false);
 </script>

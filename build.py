@@ -28,6 +28,7 @@ fetch manifest); JWST keeps GitHub raw links until its own record exists.
 import argparse
 import base64
 import csv
+import glob
 import io
 import json
 import os
@@ -338,6 +339,31 @@ def human(nbytes):
         nbytes /= 1024
 
 
+MOSAIC_KINDS = ('signal', 'snr', 'noise', 'psf')
+
+
+def mosaics_for_sample(repo, sample, out):
+    """{group: {kind: img relpath}} from the repo's tracked QC mosaics at
+    data/mosaics/<sample>/<group>_<kind>.png (HST carries these; JWST's data/mosaics holds
+    per-lens drizzle products, not QC panels, and globs empty). Re-encoded as JPEG for
+    the page — the PNGs run to several MB each."""
+    found = {}
+    for path in sorted(glob.glob(os.path.join(repo, 'data', 'mosaics', sample, '*.png'))):
+        stem = os.path.basename(path)[:-4]
+        group, _, kind = stem.rpartition('_')
+        if kind not in MOSAIC_KINDS or not group:
+            continue
+        rel = f'img/mosaics/{sample}__{stem}.jpg'
+        im = Image.open(path).convert('RGB')
+        if im.width > 2000:
+            im = im.resize((2000, im.height * 2000 // im.width), Image.LANCZOS)
+        os.makedirs(os.path.join(out, 'img', 'mosaics'), exist_ok=True)
+        with open(os.path.join(out, rel), 'wb') as f:
+            im.save(f, 'JPEG', quality=82, optimize=True)
+        found.setdefault(group, {})[kind] = rel
+    return dict(sorted(found.items(), key=lambda kv: (PIVOT.get(base_band(kv[0]), 99), kv[0])))
+
+
 # ─────────────────────────────── catalogue ───────────────────────────────
 
 def pretty_psf(p, scale):
@@ -582,6 +608,10 @@ def build(out, only=None):
             s_entry['download_all'] = dict(archive=all_name, url=all_row['url'],
                                            size=human(int(all_row['size_bytes']))) if all_row else None
             s_entry['download_total'] = human(sum(nb for _, nb in dl.values()))
+            mos = mosaics_for_sample(repo, sample, out)
+            if mos:
+                s_entry['mosaics'] = mos
+                s_entry['mosaic_colours'] = {g: band_colour(base_band(g)) for g in mos}
             if s_entry['lenses']:
                 cat['samples'].append(s_entry)
                 tel_entry['samples'].append(sample)
