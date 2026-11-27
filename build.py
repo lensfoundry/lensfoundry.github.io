@@ -64,24 +64,24 @@ TELESCOPES = [
 ]
 
 SAMPLES = {
-    'slacs': ('SLACS', 'Lenses from the Sloan Lens ACS Survey: early-type deflectors at z 0.06–0.5 with emission-line sources.',
+    'slacs': ('SLACS', 'Lenses from the Sloan Lens ACS Survey (SLACS): early-type deflectors at z 0.06–0.5 with emission-line sources.',
               'Bolton et al. 2008; Auger et al. 2009; Etherington et al. 2022'),
-    'swells': ('SWELLS', 'Disk-galaxy deflectors from SWELLS that SLACS also found.',
+    'swells': ('SWELLS', 'Late-type disk and spiral deflectors from the Sloan WFC Edge-on Late-type Lens Survey (SWELLS).',
                'Treu et al. 2011; Brewer et al. 2012'),
-    'gallery': ('BELLS GALLERY', 'Lensed Lyman-alpha emitters at z 2–3 behind BOSS galaxies, imaged with WFC3/UVIS.',
+    'gallery': ('BELLS GALLERY', 'Lensed Lyman-alpha emitters at z 2–3 behind BOSS galaxies, from the BOSS Emission-Line Lens Survey (BELLS), imaged with WFC3/UVIS.',
                 'Shu et al. 2016'),
-    'bells': ('BELLS', 'BOSS emission-line lenses imaged with ACS in F814W.',
+    'bells': ('BELLS', 'Emission-line lenses behind BOSS galaxies from the BOSS Emission-Line Lens Survey (BELLS), imaged with ACS in F814W.',
               'Brownstein et al. 2012'),
-    'dinos': ('SL2S + Project Dinos', 'SL2S lenses re-imaged in deep WFC3/UVIS F475X by Project Dinos.',
-              'Sonnenfeld et al. 2013; Sheu et al. 2025'),
-    'sl2s': ('SL2S', 'The other SL2S lenses: older WFPC2 F606W or short F475X + F600LP snapshots.',
+    'sl2s': ('SL2S', 'Grade-A lenses from the Strong Lensing Legacy Survey (SL2S), imaged in WFPC2 F606W or short WFC3/UVIS F475X + F600LP snapshots.',
              'Sonnenfeld et al. 2013'),
-    'b1938': ('JVAS B1938+666', 'A radio-loud Einstein ring with 21 dithers per filter, ~24 h each.',
+    'dinos': ('SL2S + Project Dinos', 'SL2S lenses re-imaged in deep WFC3/UVIS F475X by Project Dinos II — a set disjoint from the plain SL2S sample.',
+              'Sonnenfeld et al. 2013; Sheu et al. 2025'),
+    'b1938': ('JVAS B1938+666', 'A radio-loud Einstein ring from the Jodrell Bank VLA Astrometric Survey (JVAS), 21 dithers per filter (~24 h each).',
               'GO 8281 (PI Vegetti)'),
-    'cowls_spectacular': ('COWLS spectacular', 'The 17 top-tier lenses of the COSMOS-Web Lens Survey, imaged with NIRCam.',
-                          'Mahler et al. 2025 (COWLS II)'),
-    'spt': ('SPT dusty lenses', 'Two lensed dusty star-forming galaxies from the TEMPLATES Early Release Science program.',
-            'Rigby et al. 2025 (TEMPLATES)'),
+    'cowls-mahler': ('COWLS-Mahler', "The 17 'spectacular' (top-tier) lenses of the COSMOS-Web Lens Survey (COWLS), imaged with NIRCam.",
+                     'Mahler et al. 2025 (COWLS II)'),
+    'templates': ('TEMPLATES', 'Two lensed dusty star-forming galaxies from TEMPLATES (Targeting Extremely Magnified Panchromatic Lensed Arcs and Their Extended Star Formation), an Early Release Science program.',
+                  'Rigby et al. 2025 (TEMPLATES)'),
 }
 
 # Published Einstein radii for the JWST lenses (the JWST repo keeps none in info/; AGENTS.md
@@ -100,8 +100,9 @@ PIVOT = {'F438W': 0.433, 'F475X': 0.494, 'F555W': 0.536, 'F606W': 0.589, 'F600LP
 CARD_BAND = ['F814W', 'F606W', 'F555W', 'F600LP', 'F475X', 'F160W', 'F438W',
              'F444W', 'F277W', 'F356W', 'F200W', 'F150W', 'F115W']
 
-# Preferred sample display order on the home page (slacs and gallery first, Sam 2026-11-26).
-SAMPLE_ORDER = ['slacs', 'gallery']
+# Preferred sample display order on the home page (Sam 2026-11-26/27): slacs and gallery
+# first; dinos after sl2s, since it is a disjoint SL2S set.
+SAMPLE_ORDER = ['slacs', 'gallery', 'swells', 'bells', 'sl2s', 'dinos']
 
 INSTRUMENT = {'ACS/WFC': 'ACS/WFC', 'WFPC2/WF3': 'WFPC2 (WF3 chip)', 'WFPC2/PC': 'WFPC2 (WF3 chip)',
               'WFC3/IR': 'WFC3/IR', 'WFC3/UVIS': 'WFC3/UVIS',
