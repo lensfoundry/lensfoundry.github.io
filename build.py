@@ -3,11 +3,14 @@
 
     uv run --project ../lensfoundry-hst python build.py [--out _site] [--only LENS]
 
-Reads ONLY files tracked in git in the two reduction repos (the stamps, masks, PSFs and
-positions under data/stamps/, and the info/ JSONs), so the browser shows exactly what a clone
-carries — with ONE exception: the PSF panel renders the full kernel (with wings) from the
-gitignored data/psf/ tree when it exists on disk, falling back to the trimmed stamp kernel
-otherwise. Writes
+Reads the stamp products under data/stamps/ plus the info/ JSONs of the two reduction
+repos. The JWST repo is read from git tracking (its products are all tracked); the HST
+repo is read from the on-disk tree, since the 2026-11-27 history strip left only masks,
+positions and info/ in git — the regenerable stamp FITS and renders it reads from disk
+are the same bytes the Zenodo archives ship (info/zenodo_files.csv), and the per-file
+links route there. One exception either way: the PSF panel renders the full kernel (with
+wings) from the gitignored data/psf/ tree when it exists on disk, falling back to the
+trimmed stamp kernel otherwise. Writes
 
     <out>/index.html            the page: template.html with the catalogue embedded as JSON
     <out>/img/<lens>__<band>.jpg one sprite per band: image | lensed light | masked S/N | noise | PSF
@@ -111,10 +114,22 @@ INSTRUMENT = {'ACS/WFC': 'ACS/WFC', 'WFPC2/WF3': 'WFPC2 (WF3 chip)', 'WFPC2/PC':
 
 # ─────────────────────────────── helpers ────────────────────────────────
 
-def tracked(repo):
+def git_tracked(repo):
     out = subprocess.run(['git', '-C', repo, 'ls-files', 'data/stamps', 'info'],
                          capture_output=True, text=True, check=True).stdout
     return set(out.split('\n')) - {''}
+
+
+def stamps_on_disk(repo):
+    """Every file under data/stamps/, repo-relative. Since the 2026-11-27 untrack/strip
+    the HST stamp sci/noise/PSF FITS live on disk and on Zenodo, not in git, so the
+    browser reads the on-disk tree; git alone would find no stamps."""
+    root = os.path.join(repo, 'data', 'stamps')
+    found = set()
+    for dirpath, _, names in os.walk(root):
+        for name in names:
+            found.add(os.path.relpath(os.path.join(dirpath, name), repo))
+    return found
 
 
 def load(repo, rel):
@@ -155,6 +170,28 @@ def gh_link(tel, path):
     """A browse-the-file-on-GitHub link for one data file (genuine per-file view; the
     big archive download is presented separately, not behind a file name)."""
     return dict(url=f"https://github.com/{tel['gh']}/raw/main/{quote(path)}", where='GitHub ↗')
+
+
+def load_zenodo_files(repo):
+    """file path -> archive name from the HST repo's step-5 manifest
+    (info/zenodo_files.csv); empty when absent."""
+    path = os.path.join(repo, 'info', 'zenodo_files.csv')
+    if not os.path.isfile(path):
+        return {}
+    with open(path) as f:
+        return {r['path']: r['archive'] for r in csv.DictReader(f)}
+
+
+def file_link(tel, path, gitset, zfiles, zarch):
+    """Where a data-file row points. A git-tracked file (every JWST file; HST masks,
+    positions, info JSONs) links to its raw GitHub view; an untracked HST product
+    (the stamp sci/noise, PSFs, dataset renders) left git in the 2026-11-27 strip, so
+    the row links to the Zenodo archive that holds it."""
+    if tel['key'] == 'hst' and path not in gitset:
+        arc = zfiles.get(path)
+        if arc and arc in zarch:
+            return dict(url=zarch[arc]['url'], where=f'Zenodo ↗')
+    return gh_link(tel, path)
 
 
 def token(name):
@@ -454,8 +491,10 @@ def build(out, only=None):
     cat = dict(telescopes=[], samples=[], lenses=[])
     for tel in TELESCOPES:
         repo = tel['path']
-        files = tracked(repo)
+        gitset = git_tracked(repo)
+        files = gitset | stamps_on_disk(repo)
         zarch = load_zenodo_archives(repo) if tel['key'] == 'hst' else {}
+        zfiles = load_zenodo_files(repo) if tel['key'] == 'hst' else {}
         samples = load(repo, 'samples/lens_samples.json')
         einstein = load(repo, 'catalogues/lens_einstein_radii.json')
         inst_j = load(repo, 'provenance/lens_instrument.json')
@@ -512,9 +551,17 @@ def build(out, only=None):
                 bands = sorted(ldirs, key=lambda b: (PIVOT.get(base_band(b), 9), b))
                 for band in bands:
                     bdir = ldirs[band]
-                    bfiles = sorted(f for f in files if os.path.dirname(f) == bdir)
-                    sci_rel = next(f for f in bfiles if re.search(r'/stamp[\d.]+_sci\.fits$', f))
+                    sci_rel = next(f for f in files
+                                   if os.path.dirname(f) == bdir
+                                   and re.search(r'/stamp[\d.]+_sci\.fits$', f))
                     prefix = os.path.basename(sci_rel)[:-len('_sci.fits')]
+                    # the file table lists the band's own products only — the on-disk
+                    # dir can also hold stale renders of a superseded stamp size
+                    keep = {f'{prefix}_sci.fits', f'{prefix}_noise.fits', f'{prefix}_mask.fits',
+                            f'{prefix}_positions.json', f'{prefix}_dataset.png',
+                            'psf.fits', 'psf_err.fits'}
+                    bfiles = sorted(f for f in files
+                                    if os.path.dirname(f) == bdir and os.path.basename(f) in keep)
                     ab = lambda rel: os.path.join(repo, rel)
                     with fits.open(ab(sci_rel)) as h:
                         sci = h[0].data.astype(float)
@@ -572,7 +619,7 @@ def build(out, only=None):
                              archive=barchive,
                              files=[dict(name=os.path.basename(f),
                                          size=human(os.path.getsize(ab(f))),
-                                         **gh_link(tel, f))
+                                         **file_link(tel, f, gitset, zfiles, zarch))
                                     for f in bfiles])
                     L['bands'].append(B)
                     d = dl.setdefault(base_band(band), [0, 0])

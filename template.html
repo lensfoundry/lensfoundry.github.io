@@ -204,12 +204,20 @@ figcaption b { color: var(--fg); font-weight: 600; }
 .def .cat { font-size: var(--s0); }
 .def code { font-family: var(--f-mono); font-size: var(--s-1); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
 
-/* mosaics (sample view): the repo's QC mosaics, one row per filter group */
-.mosaics { display: grid; gap: 10px; padding-bottom: var(--s2); }
-.mos-grid { display: grid; grid-template-columns: max-content repeat(4, minmax(0, 1fr)); gap: 8px; align-items: center; }
-.mos-head { font-size: var(--s-1); color: var(--muted); text-align: center; }
-.mcell { display: block; width: 100%; aspect-ratio: 5/4; background-color: var(--plate); background-size: cover; background-position: center; border: 1px solid var(--line); border-radius: 5px; cursor: zoom-in; padding: 0; }
-.mcell:hover { border-color: var(--accent); }
+/* mosaics (sample view): a boxed list of per-filter-group viewers — no inline previews */
+.mosaics { display: grid; gap: 10px; background: var(--raise); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: var(--s2); }
+.mos-list { display: grid; gap: 6px; }
+.mosrow { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; color: var(--fg); font: inherit; cursor: pointer; }
+.mosrow:hover { border-color: var(--accent); }
+.mosrow .moskinds { font-size: var(--s-1); color: var(--muted); }
+.mosrow .view { margin-left: auto; font-size: var(--s-1); color: var(--accent); white-space: nowrap; }
+/* the mosaic viewer in the lightbox: side arrows cycle the group's four panels */
+.mosbox { position: relative; display: grid; justify-items: center; }
+.mosnav { position: absolute; top: 39%; width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.55); color: #fff; font-size: 24px; line-height: 1; cursor: pointer; }
+.mosnav:hover { background: rgba(0,0,0,0.85); }
+.mosnav.prev { left: 6px; }
+.mosnav.next { right: 6px; }
+.lightbox .mosdl { color: #9ecbff; }
 
 /* lightbox */
 .lightbox { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,0.88); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) var(--gutter-r) max(16px, env(safe-area-inset-bottom, 0px)) var(--gutter-l); }
@@ -424,18 +432,22 @@ function downloads(S) {
   const per = S.downloads.length > 1 ? S.downloads.map(d => `<li><span>${link(d, d.archive || d.filter)}</span><span class="mono">${d.bands} images · ${esc(d.size)}</span></li>`).join('') : '';
   return `<div class="downloads">${all}${per ? `<ul>${per}</ul>` : ''}</div>`;
 }
+let mosGalleries = [], mosBox = null;
 function mosaics(S) {
   if (!S.mosaics || !Object.keys(S.mosaics).length) return '';
   const kinds = [['signal', 'Signal'], ['snr', 'S/N'], ['noise', 'Noise'], ['psf', 'PSF']];
-  const rows = Object.entries(S.mosaics).map(([g, m]) => {
-    const cells = kinds.map(([k, label]) => m[k]
-      ? `<button class="mcell" style="background-image:url('${m[k]}')" data-mimg="${m[k]}" data-mlabel="${esc(S.title)} · ${esc(g.toUpperCase())} · ${label}" aria-label="${esc(g.toUpperCase())} ${label} mosaic"></button>`
-      : '<span></span>').join('');
-    return `<span class="chip bandchip" style="--c:${(S.mosaic_colours || {})[g] || '#888'}">${esc(g.toUpperCase())}</span>${cells}`;
-  }).join('');
+  mosGalleries = Object.entries(S.mosaics).map(([g, m]) => ({
+    title: `${S.title} · ${g.toUpperCase()}`, sample: S.key, group: g,
+    items: kinds.filter(([k]) => m[k]).map(([k, label]) => ({ k, label, src: m[k] })),
+  }));
+  const rows = mosGalleries.map((g, gi) =>
+    `<button class="mosrow" data-mos="${gi}" aria-label="Open the ${esc(g.group.toUpperCase())} mosaic viewer">
+      <span class="chip bandchip" style="--c:${(S.mosaic_colours || {})[g.group] || '#888'}">${esc(g.group.toUpperCase())}</span>
+      <span class="moskinds">${g.items.map(it => it.label).join(' · ')}</span>
+      <span class="view">Open viewer ›</span></button>`).join('');
   return `<section class="mosaics" aria-labelledby="mos-h"><h3 id="mos-h">Mosaics — every lens in the sample, tiled</h3>
-    <p class="muted" style="font-size:var(--s-1)">Signal, signal-to-noise, noise map and PSF kernel, one panel per lens and filter. Click a panel to enlarge.</p>
-    <div class="mos-grid"><span></span>${kinds.map(([, l]) => `<span class="mos-head">${l}</span>`).join('')}${rows}</div>
+    <p class="muted" style="font-size:var(--s-1)">Signal, signal-to-noise, noise map and PSF kernel, one panel per lens and filter. Open a viewer to step through the four with the arrows, and download any of them.</p>
+    <div class="mos-list">${rows}</div>
   </section>`;
 }
 function lensGrid(S) {
@@ -556,8 +568,11 @@ document.addEventListener('click', e => {
     c.setAttribute('aria-pressed', state.bands.has(b)); $('#grid').innerHTML = lensGrid(sampleBy[state.sample]); return; }
   const p = e.target.closest('.plate');
   if (p && !p.dataset.close) { openBox(+p.dataset.panel); return; }
-  const m = e.target.closest('[data-mimg]');
-  if (m) { openImgBox(m.dataset.mimg, m.dataset.mlabel); return; }
+  const mo = e.target.closest('[data-mos]');
+  if (mo) { mosBox = { gi: +mo.dataset.mos, ki: 0 }; drawMosBox(); return; }
+  const mn = e.target.closest('[data-mosnav]');
+  if (mn) { mosBox.ki += +mn.dataset.mosnav; drawMosBox(); return; }
+  if (e.target.closest('#lightbox a')) return;   // the mosaic download link
   if (e.target.closest('#lightbox')) { closeBox(); return; }
   if (!e.target.closest('.search')) closeResults();
 });
@@ -571,6 +586,9 @@ document.addEventListener('change', e => {
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeBox(); closeResults(); return; }
+  if (mosBox && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    mosBox.ki += e.key === 'ArrowRight' ? 1 : -1; drawMosBox(); return;
+  }
   if (e.target.id === 'q') {
     const items = [...document.querySelectorAll('#results button')];
     if (!items.length) return;
@@ -610,10 +628,18 @@ function openBox(i) {
   box.innerHTML = `<div>${plate(B, i, true)}<p>${esc(L.name)} · ${esc(B.label)} · ${PANELS[i][0]}. Click or press Esc to close.</p></div>`;
   box.hidden = false;
 }
-function closeBox() { const b = $('#lightbox'); b.hidden = true; b.innerHTML = ''; }
-function openImgBox(src, label) {
+function closeBox() { const b = $('#lightbox'); b.hidden = true; b.innerHTML = ''; mosBox = null; }
+function drawMosBox() {
+  const g = mosGalleries[mosBox.gi], n = g.items.length;
+  mosBox.ki = ((mosBox.ki % n) + n) % n;
+  const it = g.items[mosBox.ki];
   const box = $('#lightbox');
-  box.innerHTML = `<div><img class="full" src="${src}" alt="${esc(label)}"><p>${esc(label)}. Click or press Esc to close.</p></div>`;
+  box.innerHTML = `<div class="mosbox">
+    ${n > 1 ? '<button class="mosnav prev" data-mosnav="-1" aria-label="Previous mosaic panel">‹</button>' : ''}
+    <img class="full" src="${it.src}" alt="${esc(g.title)} · ${esc(it.label)} mosaic">
+    ${n > 1 ? '<button class="mosnav next" data-mosnav="1" aria-label="Next mosaic panel">›</button>' : ''}
+    <p>${esc(g.title)} · ${it.label} mosaic · ${mosBox.ki + 1} of ${n} · <a class="mosdl" href="${it.src}" download="lensfoundry_${g.sample}_${g.group}_${it.k}.jpg">download JPEG</a> · click the image or Esc to close</p>
+  </div>`;
   box.hidden = false;
 }
 
