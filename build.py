@@ -76,7 +76,7 @@ SAMPLES = {
              'Sonnenfeld et al. 2013'),
     'dinos': ('SL2S + Project Dinos', 'SL2S lenses re-imaged in deep WFC3/UVIS F475X by Project Dinos II — a separate set to the plain SL2S sample.',
               'Sonnenfeld et al. 2013; Sheu et al. 2025'),
-    'b1938': ('JVAS B1938+666', 'A radio-loud Einstein ring from the Jodrell Bank VLA Astrometric Survey (JVAS), 21 dithers per filter (~24 h each).',
+    'b1938': ('JVAS B1938+666', 'Deep imaging of the classic Keck/radio lens, which carries two substructure detections: 21 dithers per filter (~24 h each).',
               'GO 8281 (PI Vegetti)'),
     'cowls-mahler': ('COWLS-Mahler', "The 17 'spectacular' (top-tier) lenses of the COSMOS-Web Lens Survey (COWLS), imaged with NIRCam.",
                      'Mahler et al. 2025 (COWLS II)'),
