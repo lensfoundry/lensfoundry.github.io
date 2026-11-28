@@ -130,7 +130,7 @@ button.chip[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 0
 .cat { display: inline-flex; align-items: center; gap: 6px; font: 500 var(--s-1)/1 var(--f-body); }
 .cat::before { content: ""; width: 9px; height: 9px; border-radius: 2px; background: var(--c); flex: none; }
 .cats { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); }
-.downloads { display: grid; gap: 8px; padding: 12px 0 4px; }
+.downloads { display: grid; gap: 8px; padding: 12px 0 var(--s2); }
 .downloads ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--s-1); }
 .downloads li { display: inline-flex; gap: 8px; align-items: baseline; }
 .downloads .mono { color: var(--muted); }
@@ -210,6 +210,7 @@ figcaption b { color: var(--fg); font-weight: 600; }
 .mosrow { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; color: var(--fg); font: inherit; cursor: pointer; }
 .mosrow:hover { border-color: var(--accent); }
 .mosrow .moskinds { font-size: var(--s-1); color: var(--muted); }
+.mosrow .cam { margin-left: 12px; font-size: var(--s-1); color: var(--muted); white-space: nowrap; }
 .mosrow .view { margin-left: auto; font-size: var(--s-1); color: var(--accent); white-space: nowrap; }
 /* the mosaic viewer in the lightbox: side arrows cycle the group's four panels */
 .mosbox { position: relative; display: grid; justify-items: center; }
@@ -444,6 +445,7 @@ function mosaics(S) {
     `<button class="mosrow" data-mos="${gi}" aria-label="Open the ${esc(g.group.toUpperCase())} mosaic viewer">
       <span class="chip bandchip" style="--c:${(S.mosaic_colours || {})[g.group] || '#888'}">${esc(g.group.toUpperCase())}</span>
       <span class="moskinds">${g.items.map(it => it.label).join(' · ')}</span>
+      ${(S.mosaic_cameras || {})[g.group] ? `<span class="cam">${esc(S.mosaic_cameras[g.group])}</span>` : ''}
       <span class="view">Open viewer ›</span></button>`).join('');
   return `<section class="mosaics" aria-labelledby="mos-h"><h3 id="mos-h">Mosaics — every lens in the sample, tiled</h3>
     <p class="muted" style="font-size:var(--s-1)">Signal, signal-to-noise, noise map and PSF kernel, one panel per lens and filter. Open a viewer to step through the four with the arrows, and download any of them.</p>
