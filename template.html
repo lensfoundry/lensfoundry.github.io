@@ -278,7 +278,7 @@ const PANELS = [
   ['Noise map', '1σ per pixel, log scale. Streaks are masked cosmic rays and bad columns.'],
   ['PSF', 'The point-spread function kernel, log scale from 10⁻⁴ of the peak, with its wings.'],
 ];
-const state = { view: 'home', sample: null, lens: null, band: null, filter: '', bands: new Set(), cats: new Set(), mode: '', sort: 'category' };
+const state = { view: 'home', sample: null, lens: null, band: null, filter: '', bands: new Set(), cats: new Set(), mode: '', sort: 'name' };
 const CATS = {
   prime: ['Prime', 'var(--cat-prime)', 'P', 'The cleanest systems: one deflector, marked image positions, spectroscopic redshifts, and no known complication.'],
   complex: ['Complex', 'var(--cat-complex)', 'C', 'Harder to model: difficult morphology, blended lens and source light, a low-S/N arc, a nearby companion or a second source.'],
@@ -398,6 +398,12 @@ function sampleView() {
     ${downloads(S)}
     ${mosaics(S)}
     <div class="toolbar">
+      <label>Sort <select id="sort">
+        <option value="name"${state.sort === 'name' ? ' selected' : ''}>Name</option>
+        <option value="category"${state.sort === 'category' ? ' selected' : ''}>Category</option>
+        <option value="te"${state.sort === 'te' ? ' selected' : ''}>Einstein radius</option>
+        <option value="zl"${state.sort === 'zl' ? ' selected' : ''}>Lens redshift</option>
+      </select></label>
       <input id="filter" type="search" placeholder="Filter by name" value="${esc(state.filter)}" aria-label="Filter lenses by name">
       ${Object.keys(S.categories || {}).length ? `<div class="chips" role="group" aria-label="Show category">
         ${CAT_ORDER.filter(c => S.categories[c]).map(c => `<button class="chip" data-cat="${c}" style="--c:${CATS[c][1]}" aria-pressed="${state.cats.has(c)}">${CATS[c][0]}</button>`).join('')}
@@ -410,12 +416,6 @@ function sampleView() {
       <div class="chips" role="group" aria-label="Show lenses observed in">
         ${S.bands.map(b => `<button class="chip bandchip" data-band="${b}" style="--c:${S.band_colours[b]}" aria-pressed="${state.bands.has(b)}">${b}</button>`).join('')}
       </div>
-      <label>Sort <select id="sort">
-        <option value="category"${state.sort === 'category' ? ' selected' : ''}>Category</option>
-        <option value="name"${state.sort === 'name' ? ' selected' : ''}>Name</option>
-        <option value="te"${state.sort === 'te' ? ' selected' : ''}>Einstein radius</option>
-        <option value="zl"${state.sort === 'zl' ? ' selected' : ''}>Lens redshift</option>
-      </select></label>
     </div>
     <div class="grid" id="grid">${lensGrid(S)}</div>`;
 }
@@ -435,7 +435,7 @@ function downloads(S) {
 let mosGalleries = [], mosBox = null;
 function mosaics(S) {
   if (!S.mosaics || !Object.keys(S.mosaics).length) return '';
-  const kinds = [['signal', 'Signal'], ['snr', 'S/N'], ['noise', 'Noise'], ['psf', 'PSF']];
+  const kinds = [['snr', 'S/N'], ['signal', 'Signal'], ['noise', 'Noise'], ['psf', 'PSF']];
   mosGalleries = Object.entries(S.mosaics).map(([g, m]) => ({
     title: `${S.title} · ${g.toUpperCase()}`, sample: S.key, group: g,
     items: kinds.filter(([k]) => m[k]).map(([k, label]) => ({ k, label, src: m[k] })),
@@ -446,7 +446,7 @@ function mosaics(S) {
       <span class="moskinds">${g.items.map(it => it.label).join(' · ')}</span>
       <span class="view">Open viewer ›</span></button>`).join('');
   return `<section class="mosaics" aria-labelledby="mos-h"><h3 id="mos-h">Mosaics — every lens in the sample, tiled</h3>
-    <p class="muted" style="font-size:var(--s-1)">Signal, signal-to-noise, noise map and PSF kernel, one panel per lens and filter. Open a viewer to step through the four with the arrows, and download any of them.</p>
+    <p class="muted" style="font-size:var(--s-1)">Signal-to-noise, signal, noise map and PSF kernel, one panel per lens and filter. Open a viewer to step through the four with the arrows, and download any of them.</p>
     <div class="mos-list">${rows}</div>
   </section>`;
 }
