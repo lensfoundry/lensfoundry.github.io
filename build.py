@@ -111,12 +111,6 @@ INSTRUMENT = {'ACS/WFC': 'ACS/WFC', 'WFPC2/WF3': 'WFPC2 (WF3 chip)', 'WFPC2/PC':
               'WFC3/IR': 'WFC3/IR', 'WFC3/UVIS': 'WFC3/UVIS',
               'NIRCAM/SW': 'NIRCam short wavelength', 'NIRCAM/LW': 'NIRCam long wavelength'}
 
-# Compact camera label for the mosaic rows (the same filter can sit on different
-# cameras: sl2s F606W is WFPC2 for most lenses but ACS on J0217-0513).
-CAMERA_SHORT = {'ACS/WFC': 'ACS/WFC', 'WFPC2/WF3': 'WFPC2', 'WFPC2/PC': 'WFPC2',
-                'WFC3/IR': 'WFC3/IR', 'WFC3/UVIS': 'WFC3/UVIS',
-                'NIRCAM/SW': 'NIRCam SW', 'NIRCAM/LW': 'NIRCam LW'}
-
 
 # ─────────────────────────────── helpers ────────────────────────────────
 
@@ -525,7 +519,6 @@ def build(out, only=None):
             s_entry = dict(key=sample, telescope=tel['key'], title=title, blurb=blurb, refs=refs,
                            lenses=[], bands=set(), categories={})
             dl = {}      # filter -> [n bands, bytes]: the per-(sample, filter) release archives
-            cam_of = {}  # base band -> the cameras it sits on within this sample
             for lens in lenses:
                 if only and lens != only:
                     continue
@@ -608,8 +601,6 @@ def build(out, only=None):
                     with open(os.path.join(out, img_name), 'wb') as f:
                         f.write(jpeg_bytes(Image.fromarray(sprite), 84))
                     instr = dig(inst_j, sample, lens, band)
-                    if instr:
-                        cam_of.setdefault(base_band(band), set()).add(instr)
                     prec = dig(pos_j, sample, lens, band) or {}
                     mrec = dig(mask_j, sample, lens, band) or {}
                     barchive = band_archive(zarch, sample, band) if zarch else None
@@ -672,8 +663,6 @@ def build(out, only=None):
             if mos:
                 s_entry['mosaics'] = mos
                 s_entry['mosaic_colours'] = {g: band_colour(base_band(g)) for g in mos}
-                s_entry['mosaic_cameras'] = {g: ' · '.join(sorted(
-                    CAMERA_SHORT.get(i, i) for i in cam_of.get(g.upper(), ()))) for g in mos}
             if s_entry['lenses']:
                 cat['samples'].append(s_entry)
                 tel_entry['samples'].append(sample)
